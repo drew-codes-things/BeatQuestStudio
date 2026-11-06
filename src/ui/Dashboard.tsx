@@ -1,18 +1,96 @@
 import { useCallback, useEffect, useState } from "react";
+import type { BatchMaker } from "../batch/batchMaker";
+import { type ExportDestination, type ExportProgress, type ExportReport, exportProjects } from "../batch/exportMaps";
 import { newProject } from "../core/model";
+import { folderPickerAvailable, pickCustomLevelsFolder } from "../quest/folder";
 import type { Backup, ProjectStore, ProjectSummary } from "../storage/projectStore";
+import { BatchPanel, useBatchSnapshot } from "./BatchPanel";
 import { errorMessage, formatTimestamp } from "./format";
+import { audioContext } from "./session";
 
 interface DashboardProps {
   store: ProjectStore;
+  batch: BatchMaker;
   onOpen: (projectId: string) => void;
 }
 
 const DEFAULT_PROJECT_NAME = "Untitled map";
 
-export function Dashboard({ store, onOpen }: DashboardProps) {
+function reportText(report: ExportReport, destination: ExportDestination["kind"]): string {
+  const where = destination === "zip" ? ` in ${report.zipParts} zip ${report.zipParts === 1 ? "file" : "files"}` : " into CustomLevels";
+  return `Exported ${report.exported.length} ${report.exported.length === 1 ? "map" : "maps"}${where}.`;
+}
+
+interface ExportBarProps {
+  store: ProjectStore;
+  projects: ProjectSummary[];
+  selected: ReadonlySet<string>;
+  onSelect: (ids: ReadonlySet<string>) => void;
+}
+
+function ExportBar({ store, projects, selected, onSelect }: ExportBarProps) {
+  const [progress, setProgress] = useState<ExportProgress | null>(null);
+  const [report, setReport] = useState<{ text: string; skipped: ExportReport["skipped"] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const mapped = projects.filter((project) => project.noteCount > 0);
+  const busy = progress !== null;
+
+  const runExport = async (chooseDestination: () => Promise<ExportDestination>) => {
+    setError(null);
+    setReport(null);
+    try {
+      const destination = await chooseDestination();
+      const ids = projects.filter((project) => selected.has(project.id)).map((project) => project.id);
+      setProgress({ done: 0, total: ids.length, current: "" });
+      const result = await exportProjects(ids, destination, { store, context: audioContext, onProgress: setProgress });
+      setReport({ text: reportText(result, destination.kind), skipped: result.skipped });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setProgress(null);
+    }
+  };
+
+  return (
+    <section className="card" data-testid="export-bar">
+      <h3>Export many</h3>
+      <p className="meta">
+        Tick projects below, then export them together. Zips are split every 256 MB so a big export never has to sit in memory at once.
+      </p>
+      <div className="toolbar wrap">
+        <span className="meta" data-testid="selected-count">{selected.size} selected</span>
+        <button onClick={() => onSelect(new Set(mapped.map((project) => project.id)))} disabled={mapped.length === 0 || busy}>Select all with notes ({mapped.length})</button>
+        <button onClick={() => onSelect(new Set())} disabled={selected.size === 0 || busy}>Clear selection</button>
+        <button className="primary" disabled={selected.size === 0 || busy} onClick={() => void runExport(async () => ({ kind: "zip" }))} data-testid="export-many-zip">Download as .zip</button>
+        <button disabled={selected.size === 0 || busy || !folderPickerAvailable()}
+          onClick={() => void runExport(async () => ({ kind: "folder", customLevels: await pickCustomLevelsFolder() }))}>Save into a CustomLevels folder</button>
+      </div>
+      {progress && (
+        <div className="info-banner" role="status">
+          Exporting {Math.min(progress.done + 1, progress.total)} of {progress.total}{progress.current ? `: ${progress.current}` : ""}
+          <progress className="batch-progress" max={progress.total} value={progress.done} />
+        </div>
+      )}
+      {error && <div className="error-banner" role="alert">{error}</div>}
+      {report && (
+        <div data-testid="export-many-result">
+          <p className="meta ok">{report.text}</p>
+          {report.skipped.length > 0 && (
+            <ul className="batch-list">
+              {report.skipped.map((skip) => <li key={skip.name} className="skipped"><span className="status">Skipped</span><span className="label">{skip.name}</span><span className="message">{skip.reason}</span></li>)}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function Dashboard({ store, batch, onOpen }: DashboardProps) {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const madeByBatch = useBatchSnapshot(batch).counts.done;
 
   const refresh = useCallback(async () => {
     setProjects(await store.listProjects());
@@ -30,7 +108,14 @@ export function Dashboard({ store, onOpen }: DashboardProps) {
 
   useEffect(() => {
     void run(async () => {});
-  }, [run]);
+  }, [run, madeByBatch]);
+
+  const toggleSelected = (projectId: string) => {
+    const next = new Set(selected);
+    if (next.has(projectId)) next.delete(projectId);
+    else next.add(projectId);
+    setSelected(next);
+  };
 
   const createProject = () => run(async () => {
     const project = newProject(crypto.randomUUID(), DEFAULT_PROJECT_NAME, Date.now());
@@ -44,12 +129,14 @@ export function Dashboard({ store, onOpen }: DashboardProps) {
         <button className="primary" onClick={createProject}>New project</button>
       </div>
       {error && <div className="error-banner" role="alert">{error}</div>}
+      <BatchPanel batch={batch} />
+      {projects.length > 0 && <ExportBar store={store} projects={projects} selected={selected} onSelect={setSelected} />}
       {projects.length === 0 ? (
         <div className="empty">No projects yet. Start one with New project.</div>
       ) : (
         <div className="project-list">
           {projects.map((summary) => (
-            <ProjectCard key={summary.id} summary={summary} store={store} run={run} onOpen={onOpen} />
+            <ProjectCard key={summary.id} summary={summary} store={store} run={run} onOpen={onOpen} selected={selected.has(summary.id)} onToggle={() => toggleSelected(summary.id)} />
           ))}
         </div>
       )}
@@ -62,9 +149,11 @@ interface ProjectCardProps {
   store: ProjectStore;
   run: (action: () => Promise<void>) => Promise<void>;
   onOpen: (projectId: string) => void;
+  selected: boolean;
+  onToggle: () => void;
 }
 
-function ProjectCard({ summary, store, run, onOpen }: ProjectCardProps) {
+function ProjectCard({ summary, store, run, onOpen, selected, onToggle }: ProjectCardProps) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(summary.name);
   const [deleteArmed, setDeleteArmed] = useState(false);
@@ -112,6 +201,7 @@ function ProjectCard({ summary, store, run, onOpen }: ProjectCardProps) {
 
   return (
     <div className="project-card">
+      <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Select ${summary.name}`} />
       <div className="spacer">
         {renaming ? (
           <form onSubmit={(event) => { event.preventDefault(); void saveRename(); }}>
@@ -123,7 +213,7 @@ function ProjectCard({ summary, store, run, onOpen }: ProjectCardProps) {
           <div className="name" onClick={() => onOpen(summary.id)}>{summary.name}</div>
         )}
         <div className="meta">
-          {summary.songTitle ?? "No song yet"} · edited {formatTimestamp(summary.updatedAt)}
+          {summary.songTitle ?? "No song yet"} · {summary.noteCount} notes · edited {formatTimestamp(summary.updatedAt)}
         </div>
         {backups && (
           <div className="backup-list">

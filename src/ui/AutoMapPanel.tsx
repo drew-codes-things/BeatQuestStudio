@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { type Chart, chartObjectCount, DIFFICULTIES, type Difficulty, type Project } from "../core/model";
-import { generateChart } from "../generator/generate";
+import { generateCharts } from "../generator/generate";
 import type { ProjectStore } from "../storage/projectStore";
 import { errorMessage } from "./format";
 import type { SongSession } from "./session";
@@ -35,11 +35,7 @@ export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPa
     setError(null);
     try {
       await store.createBackup(project, "before auto-map", Date.now());
-      const input = { timing: project.timing, durationSeconds: session.analysis.durationSeconds, onsets: session.analysis.onsets, energy: session.analysis.energy };
-      const charts: Partial<Record<Difficulty, Chart>> = {};
-      for (const difficulty of DIFFICULTIES) {
-        if (chosen.has(difficulty)) charts[difficulty] = generateChart(input, difficulty, seed, () => crypto.randomUUID());
-      }
+      const charts = generateCharts(project.timing, session.analysis, DIFFICULTIES.filter((difficulty) => chosen.has(difficulty)), seed, () => crypto.randomUUID());
       onGenerated(charts);
       const summary = Object.entries(charts).map(([difficulty, chart]) => `${difficulty} ${chart.notes.length}`).join(", ");
       setStatus(`Drafted ${summary} notes from seed "${seed}". A backup of the previous version was saved.`);

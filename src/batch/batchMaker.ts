@@ -1,0 +1,107 @@
+import { AudioWorkerClient } from "../audio/workerProtocol";
+import { DIFFICULTIES, newProject, type Project } from "../core/model";
+import { generateCharts } from "../generator/generate";
+import { type ReadSong, readSongFile, titleFromFileName, withImportedSong } from "../import/songImport";
+import type { ProjectStore } from "../storage/projectStore";
+import { BATCH_ITEM_TIMEOUT_MS, BATCH_REST_MS, hasStorageRoom, importRejection } from "./limits";
+import { BatchQueue } from "./queue";
+
+const MEGABYTE = 1024 * 1024;
+
+interface FileWithPath extends File {
+  webkitRelativePath: string;
+}
+
+function labelFor(file: File): string {
+  const relative = (file as FileWithPath).webkitRelativePath;
+  return relative || file.name;
+}
+
+async function estimateStorage(): Promise<StorageEstimate> {
+  if (!navigator.storage?.estimate) return {};
+  return navigator.storage.estimate();
+}
+
+export class BatchMaker {
+  readonly queue: BatchQueue<File>;
+  private worker: AudioWorkerClient | null = null;
+  private generation = 0;
+  private persistenceRequested = false;
+
+  constructor(private readonly store: ProjectStore, private readonly context: () => BaseAudioContext) {
+    this.queue = new BatchQueue<File>({
+      process: (file) => this.makeMap(file),
+      timeoutMs: BATCH_ITEM_TIMEOUT_MS,
+      restMs: BATCH_REST_MS,
+      checkRoom: (file) => this.checkRoom(file),
+      onTimeout: () => this.abandonCurrent(),
+    });
+  }
+
+  addFiles(files: Iterable<File>): void {
+    this.queue.add(Array.from(files, (file) => ({ input: file, label: labelFor(file), rejection: importRejection(file) })));
+  }
+
+  start(): void {
+    this.requestPersistentStorage();
+    void this.queue.start();
+  }
+
+  dispose(): void {
+    this.queue.stop();
+    this.worker?.dispose();
+    this.worker = null;
+  }
+
+  private workerClient(): AudioWorkerClient {
+    this.worker ??= new AudioWorkerClient();
+    return this.worker;
+  }
+
+  private abandonCurrent(): void {
+    this.generation += 1;
+    this.worker?.dispose();
+    this.worker = null;
+  }
+
+  private requestPersistentStorage(): void {
+    if (this.persistenceRequested || !navigator.storage?.persist) return;
+    this.persistenceRequested = true;
+    void navigator.storage.persist();
+  }
+
+  private async checkRoom(file: File): Promise<string | null> {
+    const estimate = await estimateStorage();
+    if (hasStorageRoom(estimate, file.size)) return null;
+    const freeMegabytes = Math.max(0, Math.round(((estimate.quota ?? 0) - (estimate.usage ?? 0)) / MEGABYTE));
+    return `Browser storage is nearly full (${freeMegabytes} MB free), so the batch paused before "${file.name}". Delete projects you no longer need or free some disk space, then press Start again.`;
+  }
+
+  private async makeMap(file: File): Promise<string> {
+    const startedIn = this.generation;
+    const read = await readSongFile(file, this.context(), this.workerClient());
+    const title = titleFromFileName(file.name);
+    const now = Date.now();
+    const project = withImportedSong(newProject(crypto.randomUUID(), title, now), { storedFileName: read.audio.fileName, sourceName: file.name, analysis: read.analysis }, now);
+    const charts = generateCharts(project.timing, read.analysis, DIFFICULTIES, title, () => crypto.randomUUID());
+    if (startedIn !== this.generation) throw new Error(`"${file.name}" was abandoned after taking too long`);
+    await this.saveProjectWithAudio({ ...project, charts: { ...project.charts, ...charts } }, read.audio);
+    const counts = DIFFICULTIES.map((difficulty) => `${difficulty} ${charts[difficulty]?.notes.length ?? 0}`).join(", ");
+    return `${Math.round(project.timing.bpm * 100) / 100} BPM${read.strippedFromVideo ? ", sound taken from the video" : ""}: ${counts} notes`;
+  }
+
+  private async saveProjectWithAudio(project: Project, audio: ReadSong["audio"]): Promise<void> {
+    try {
+      await this.store.saveAudio({ projectId: project.id, ...audio });
+      await this.store.saveProject(project);
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      try {
+        await this.store.deleteProject(project.id);
+      } catch (cleanup) {
+        throw new Error(`saving failed (${reason}) and the half-saved project could not be removed (${cleanup instanceof Error ? cleanup.message : String(cleanup)})`);
+      }
+      throw new Error(`saving failed: ${reason}`);
+    }
+  }
+}

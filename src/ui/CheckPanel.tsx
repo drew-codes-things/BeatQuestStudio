@@ -4,7 +4,7 @@ import type { Project } from "../core/model";
 import { mapFolderName } from "../export/beatmap";
 import { zipMapFiles } from "../export/package";
 import { downloadBytes, prepareMapFiles } from "../export/prepare";
-import { folderPickerAvailable, installIntoFolder } from "../quest/folder";
+import { folderPickerAvailable, pickCustomLevelsFolder, writeMapFolder } from "../quest/folder";
 import { beatSaberInstalled, connectQuest, CUSTOM_LEVELS_PATH, type DetectedHeadset, detectHeadset, installOverUsb, listCustomLevels, type QuestConnection, webUsbAvailable } from "../quest/usb";
 import type { ProjectStore } from "../storage/projectStore";
 import { hasErrors, type Issue, validateProject } from "../validation/validate";
@@ -64,7 +64,12 @@ export function CheckPanel({ project, store, session, worker, onFocus }: CheckPa
     }
   };
 
-  const files = () => prepareMapFiles(project, store, session?.buffer ?? null, worker);
+  const sessionBuffer = async () => {
+    if (!session) throw new Error("the song is still loading; try again in a moment");
+    return session.buffer;
+  };
+
+  const files = () => prepareMapFiles(project, store, sessionBuffer, worker);
 
   const download = () => run("Building the map...", async () => {
     const zip = zipMapFiles(await files());
@@ -72,7 +77,10 @@ export function CheckPanel({ project, store, session, worker, onFocus }: CheckPa
     return `Downloaded ${folder}.zip (${Math.round(zip.length / 1024)} KB).`;
   });
 
-  const saveToFolder = () => run("Writing to the folder...", async () => `Saved to ${await installIntoFolder(await files(), folder)}.`);
+  const saveToFolder = () => run("Writing to the folder...", async () => {
+    const customLevels = await pickCustomLevelsFolder();
+    return `Saved to ${await writeMapFolder(customLevels, await files(), folder)}.`;
+  });
 
   const detect = () => run("Looking for the headset...", async () => {
     const found = await detectHeadset();

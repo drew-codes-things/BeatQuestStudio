@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { unzipSync } from "fflate";
 import puppeteer from "puppeteer-core";
@@ -16,6 +16,9 @@ const BPM_TOLERANCE = 0.05;
 const OFFSET_TOLERANCE_MS = 5;
 const GRID_CELL_SIZE = 76;
 const FORMATS = ["song.wav", "song.mp3", "song.m4a", "song.opus", "song.ogg", "song.flac", "clip.mp4", "clip.webm", "clip.mov"];
+const OVERSIZE_BYTES = 300 * 1024 * 1024;
+const BATCH_FILES = ["song.opus", "clip.mp4", "song.flac", "huge.mp3", "notes.txt"];
+const BATCH_TIMEOUT_MS = 120_000;
 const EXPECTED_ZIP_FILES = ["EasyStandard.dat", "ExpertStandard.dat", "HardStandard.dat", "Info.dat", "NormalStandard.dat", "cover.png", "song.egg"];
 
 const pause = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
@@ -198,10 +201,10 @@ async function runEditorFlow(page, shoot) {
   await expectText(page, "All changes saved");
 }
 
-async function waitForZip() {
+async function waitForZip(prefix = "") {
   const deadline = Date.now() + EXPORT_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const zipName = readdirSync(DOWNLOAD_DIR).find((name) => name.endsWith(".zip"));
+    const zipName = readdirSync(DOWNLOAD_DIR).find((name) => name.startsWith(prefix) && name.endsWith(".zip"));
     if (zipName) return zipName;
     await pause(200);
   }
@@ -239,6 +242,61 @@ async function runExport(page, shoot, browser) {
   console.log(`export: ${zipName}, Info ${info._version} at ${info._beatsPerMinute} BPM, ${difficultyCount} difficulties, Expert v${expert.version} with ${expert.colorNotes.length} notes, song.egg vorbis ${song.durationSeconds.toFixed(2)}s`);
 }
 
+function writeBatchExtras() {
+  writeFileSync(join(FIXTURE_DIR, "notes.txt"), "not a song");
+  writeFileSync(join(FIXTURE_DIR, "huge.mp3"), "");
+  truncateSync(join(FIXTURE_DIR, "huge.mp3"), OVERSIZE_BYTES);
+}
+
+async function batchRows(page) {
+  return page.$$eval('[data-testid="batch-row"]', (rows) => rows.map((row) => ({
+    status: row.className,
+    label: row.querySelector(".label").textContent,
+    message: row.querySelector(".message")?.textContent ?? "",
+  })));
+}
+
+async function runBatch(page, shoot) {
+  writeBatchExtras();
+  await page.goto(PREVIEW_URL);
+  const input = await page.waitForSelector('[data-testid="batch-files"]');
+  const started = Date.now();
+  await input.uploadFile(...BATCH_FILES.map((name) => join(FIXTURE_DIR, name)));
+  await page.waitForFunction((count) => document.querySelector('[data-testid="batch-progress"]')?.textContent.startsWith(`${count} of ${count} finished`), { timeout: BATCH_TIMEOUT_MS }, BATCH_FILES.length);
+  const rows = await batchRows(page);
+  for (const row of rows) console.log(`batch ${row.status} ${row.label}: ${row.message}`);
+  const progress = await page.$eval('[data-testid="batch-progress"]', (node) => node.textContent);
+  console.log(`batch: ${progress} in ${(Date.now() - started) / 1000}s`);
+  if (!progress.includes("3 made, 0 failed, 2 skipped")) throw new Error(`batch result was "${progress}"`);
+  const byLabel = Object.fromEntries(rows.map((row) => [row.label, row]));
+  if (!byLabel["huge.mp3"].message.includes("256 MB")) throw new Error("the oversize file was not stopped by the size limit");
+  if (!byLabel["notes.txt"].message.includes("not an audio or video file")) throw new Error("the text file was not rejected");
+  await shoot("07-batch");
+  await clickButton(page, "Select all with notes (4)");
+  await expectText(page, "4 selected");
+  rmSync(DOWNLOAD_DIR, { recursive: true, force: true });
+  mkdirSync(DOWNLOAD_DIR, { recursive: true });
+  await page.click('[data-testid="export-many-zip"]');
+  await page.waitForSelector('[data-testid="export-many-result"]', { timeout: EXPORT_TIMEOUT_MS });
+  const resultText = await page.$eval('[data-testid="export-many-result"]', (node) => node.textContent);
+  await shoot("08-export-many");
+  const zipName = await waitForZip("beatmap-studio-maps-");
+  await pause(500);
+  const files = unzipSync(new Uint8Array(readFileSync(join(DOWNLOAD_DIR, zipName))));
+  const folders = [...new Set(Object.keys(files).map((path) => path.split("/")[0]))];
+  if (folders.length !== 4) throw new Error(`expected 4 map folders, found ${folders.join(", ")}`);
+  for (const folder of folders) {
+    const info = JSON.parse(new TextDecoder().decode(files[`${folder}/Info.dat`]));
+    const songPath = join(DOWNLOAD_DIR, "batch-song.egg");
+    writeFileSync(songPath, files[`${folder}/song.egg`]);
+    const song = probeCodec(songPath);
+    if (song.codec !== "vorbis") throw new Error(`${folder}/song.egg is ${song.codec}`);
+    const difficulties = info._difficultyBeatmapSets[0]._difficultyBeatmaps.map((entry) => entry._difficulty).join("/");
+    console.log(`export many: ${folder} at ${info._beatsPerMinute} BPM, ${difficulties}, song.egg vorbis ${song.durationSeconds.toFixed(1)}s`);
+  }
+  console.log(`export many: ${resultText}`);
+}
+
 async function main() {
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const expected = makeFixtures();
@@ -256,6 +314,7 @@ async function main() {
     await runFormats(page, expected);
     await runEditorFlow(page, shoot);
     await runExport(page, shoot, browser);
+    await runBatch(page, shoot);
     if (pageErrors.length > 0) throw new Error(`page reported errors:\n${pageErrors.join("\n")}`);
     console.log("ui smoke passed");
   } finally {

@@ -8,7 +8,8 @@ import { AutoMapPanel } from "./AutoMapPanel";
 import { CheckPanel } from "./CheckPanel";
 import { Editor, type EditorFocus } from "./editor/Editor";
 import { errorMessage } from "./format";
-import { importSongFile, openSession, type SongSession, titleFromFileName } from "./session";
+import { withImportedSong } from "../import/songImport";
+import { importSongFile, openSession, type SongSession } from "./session";
 import { SongPanel } from "./SongPanel";
 
 interface ProjectViewProps {
@@ -27,8 +28,6 @@ const TABS: { tab: Tab; label: string }[] = [
 ];
 
 const AUTOSAVE_DELAY_MS = 800;
-const DEFAULT_PREVIEW_SECONDS = 10;
-const PREVIEW_POSITION = 0.4;
 
 const SAVE_STATE_LABELS: Record<SaveState, string> = {
   saved: "All changes saved",
@@ -112,21 +111,7 @@ export function ProjectView({ store, projectId, onClose }: ProjectViewProps) {
       session?.player.dispose();
       setSession(imported.session);
       const { analysis } = imported.session;
-      change((project) => ({
-        ...project,
-        timing: { bpm: analysis.tempo.bpm, offsetSeconds: analysis.tempo.offsetSeconds },
-        song: {
-          title: project.song?.title || titleFromFileName(file.name),
-          subTitle: project.song?.subTitle ?? "",
-          artist: project.song?.artist ?? "",
-          mapper: project.song?.mapper ?? "",
-          fileName: imported.audio.fileName,
-          durationSeconds: analysis.durationSeconds,
-          previewStartSeconds: Math.round(analysis.durationSeconds * PREVIEW_POSITION),
-          previewDurationSeconds: DEFAULT_PREVIEW_SECONDS,
-          beatDriftMs: analysis.tempo.driftMs,
-        },
-      }));
+      change((project) => withImportedSong(project, { storedFileName: imported.audio.fileName, sourceName: file.name, analysis }, Date.now()));
     } catch (cause) {
       setSongError(errorMessage(cause));
     } finally {

@@ -10,14 +10,18 @@ export function folderPickerAvailable(): boolean {
   return "showDirectoryPicker" in window;
 }
 
-export async function installIntoFolder(files: MapFiles, mapFolderName: string): Promise<string> {
+export async function pickCustomLevelsFolder(): Promise<FileSystemDirectoryHandle> {
   if (!folderPickerAvailable()) throw new Error("this browser cannot write to folders; use Chrome or Edge");
   const picker = window as unknown as DirectoryPickerWindow;
   const chosen = await picker.showDirectoryPicker({ id: "beatsaber-custom-levels", mode: "readwrite" });
   if (chosen.name !== CUSTOM_LEVELS_FOLDER) {
     throw new Error(`pick the folder called ${CUSTOM_LEVELS_FOLDER} (you picked "${chosen.name}")`);
   }
-  const mapFolder = await chosen.getDirectoryHandle(mapFolderName, { create: true });
+  return chosen;
+}
+
+export async function writeMapFolder(customLevels: FileSystemDirectoryHandle, files: MapFiles, mapFolderName: string): Promise<string> {
+  const mapFolder = await customLevels.getDirectoryHandle(mapFolderName, { create: true });
   for (const [name, bytes] of Object.entries(files)) {
     const handle = await mapFolder.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();

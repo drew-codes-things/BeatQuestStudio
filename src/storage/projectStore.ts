@@ -1,4 +1,4 @@
-import type { Project } from "../core/model";
+import { DIFFICULTIES, type Project } from "../core/model";
 
 const DATABASE_NAME = "beatmap-studio";
 const DATABASE_VERSION = 2;
@@ -36,6 +36,11 @@ export interface ProjectSummary {
   name: string;
   updatedAt: number;
   songTitle: string | null;
+  noteCount: number;
+}
+
+function totalNotes(project: Project): number {
+  return DIFFICULTIES.reduce((total, difficulty) => total + project.charts[difficulty].notes.length, 0);
 }
 
 function requestToPromise<T>(request: IDBRequest<T>, context: string): Promise<T> {
@@ -81,7 +86,7 @@ export class ProjectStore {
     const store = this.database.transaction(PROJECTS, "readonly").objectStore(PROJECTS);
     const projects = await requestToPromise(store.getAll() as IDBRequest<Project[]>, "listing projects");
     return projects
-      .map((project) => ({ id: project.id, name: project.name, updatedAt: project.updatedAt, songTitle: project.song?.title ?? null }))
+      .map((project) => ({ id: project.id, name: project.name, updatedAt: project.updatedAt, songTitle: project.song?.title ?? null, noteCount: totalNotes(project) }))
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }
 

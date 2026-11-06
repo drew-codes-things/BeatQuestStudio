@@ -1,30 +1,56 @@
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url(./fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url(./fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url(./fonts/ibm-plex-sans-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+
 :root {
-  --bg: #0d0e12;
-  --panel: #16181f;
-  --panel-raised: #1e212a;
-  --border: #2a2e3a;
-  --text: #e8eaf0;
-  --text-dim: #8a90a2;
-  --red: #ff3b4e;
-  --red-soft: rgba(255, 59, 78, 0.15);
+  --bg: #0a0a0b;
+  --panel: rgba(20, 20, 22, 0.86);
+  --panel-raised: #1a1a1d;
+  --border: #26262b;
+  --border-bright: #3a3a40;
+  --text: #ececec;
+  --text-dim: #a1a1a6;
+  --red: #e5383b;
+  --red-dim: #7a0f14;
+  --red-soft: rgba(229, 56, 59, 0.14);
   --blue: #3b8bff;
   --blue-soft: rgba(59, 139, 255, 0.15);
   --ok: #4ade80;
-  --warn: #fbbf24;
-  --radius: 10px;
+  --warn: #f5a524;
+  --radius: 12px;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   color-scheme: dark;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  background:
+    radial-gradient(120% 70% at 0% 0%, rgba(160, 20, 28, 0.38), transparent 60%) fixed,
+    linear-gradient(165deg, #1c0608 0%, #0d0b0c 42%, #070708 100%) fixed,
+    var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(229, 56, 59, 0.35);
+  color: #fff;
 }
 
 button,
@@ -42,7 +68,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--blue);
+  border-color: var(--border-bright);
 }
 
 button:disabled {
@@ -51,9 +77,14 @@ button:disabled {
 }
 
 button.primary {
-  background: linear-gradient(90deg, var(--red), var(--blue));
-  border: none;
+  background: linear-gradient(90deg, var(--red-dim), var(--red));
+  border: 1px solid var(--red);
+  color: #fff;
   font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  border-color: #f0a8a9;
 }
 
 button.danger {
@@ -74,7 +105,7 @@ input[type="text"] {
 
 input[type="text"]:focus {
   outline: none;
-  border-color: var(--blue);
+  border-color: var(--red);
 }
 
 .app-header {
@@ -83,7 +114,12 @@ input[type="text"]:focus {
   gap: 12px;
   padding: 14px 24px;
   border-bottom: 1px solid var(--border);
-  background: var(--panel);
+  background: rgba(7, 9, 12, 0.92);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .logo {
@@ -97,7 +133,7 @@ input[type="text"]:focus {
 }
 
 .logo .blue {
-  color: var(--blue);
+  color: var(--text);
 }
 
 .spacer {
@@ -133,7 +169,7 @@ input[type="text"]:focus {
 }
 
 .project-card:nth-child(even) {
-  border-left-color: var(--blue);
+  border-left-color: var(--red-dim);
 }
 
 .project-card .name {
@@ -260,7 +296,7 @@ input[type="text"]:focus {
 }
 
 .difficulty-tabs .tab.active {
-  border-bottom-color: var(--blue);
+  border-bottom-color: #f0a8a9;
 }
 
 .tab .count {
@@ -269,6 +305,8 @@ input[type="text"]:focus {
 }
 
 .card {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -314,8 +352,8 @@ input[type="text"]:focus {
 }
 
 .info-banner {
-  background: var(--blue-soft);
-  border: 1px solid var(--blue);
+  background: var(--panel-raised);
+  border: 1px solid var(--border-bright);
   border-radius: var(--radius);
   padding: 10px 14px;
   margin-bottom: 12px;
@@ -398,8 +436,8 @@ select {
 }
 
 .direction-pad button.active {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--red);
+  border-color: var(--red);
 }
 
 .status-line {
@@ -464,7 +502,7 @@ select {
 
 .shortcuts dt {
   color: var(--text);
-  font-family: ui-monospace, monospace;
+  font-family: var(--mono);
 }
 
 .shortcuts dd {
@@ -503,10 +541,12 @@ select {
 }
 
 .issue-list .difficulty {
-  color: var(--blue);
+  color: #f0a8a9;
 }
 
 code {
+  font-family: var(--mono);
+  color: #f0a8a9;
   background: var(--panel-raised);
   padding: 1px 5px;
   border-radius: 4px;
@@ -520,4 +560,100 @@ code {
     padding-left: 16px;
     padding-right: 16px;
   }
+}
+
+.toolbar.wrap {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.file-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.file-button:hover {
+  border-color: var(--border-bright);
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-button:focus-within {
+  outline: 2px solid var(--red);
+}
+
+.batch-progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--red);
+  margin-top: 6px;
+}
+
+.batch-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 4px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.batch-list li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--panel-raised);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.batch-list .status {
+  min-width: 60px;
+  font-weight: 600;
+}
+
+.batch-list .label {
+  word-break: break-all;
+}
+
+.batch-list .message {
+  color: var(--text-dim);
+  flex-basis: 100%;
+}
+
+.batch-list li.done .status {
+  color: var(--ok);
+}
+
+.batch-list li.failed .status {
+  color: var(--red);
+}
+
+.batch-list li.skipped .status {
+  color: var(--warn);
+}
+
+.batch-list li.working .status {
+  color: #f0a8a9;
+}
+
+.project-card input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--red);
 }

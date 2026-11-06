@@ -1,4 +1,4 @@
-import { type Onset, energyAt } from "../audio/analysis";
+import { type Onset, type SongAnalysis, energyAt } from "../audio/analysis";
 import type { IdFactory } from "../core/edit";
 import { sortChart } from "../core/edit";
 import type { Bomb, Chart, CutDirection, Difficulty, Note, NoteColor, Timing, Wall } from "../core/model";
@@ -94,6 +94,13 @@ function gridMatches(input: GeneratorInput, barStart: number, divisionsPerBeat: 
     if (Math.abs(beatToSeconds(nearest, input.timing) - onset.seconds) <= GRID_MATCH_SECONDS) matches += 1;
   }
   return matches;
+}
+
+export type SongFeatures = Pick<SongAnalysis, "durationSeconds" | "onsets" | "energy">;
+
+export function generateCharts(timing: Timing, song: SongFeatures, difficulties: readonly Difficulty[], seed: string, makeId: IdFactory): Partial<Record<Difficulty, Chart>> {
+  const input: GeneratorInput = { timing, durationSeconds: song.durationSeconds, onsets: song.onsets, energy: song.energy };
+  return Object.fromEntries(difficulties.map((difficulty) => [difficulty, generateChart(input, difficulty, seed, makeId)]));
 }
 
 export function barDivisions(input: GeneratorInput, profile: DifficultyProfile, barStart: number): number {

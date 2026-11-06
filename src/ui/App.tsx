@@ -1,13 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { BatchMaker } from "../batch/batchMaker";
 import { ProjectStore } from "../storage/projectStore";
+import { useBatchSnapshot } from "./BatchPanel";
 import { Dashboard } from "./Dashboard";
 import { errorMessage } from "./format";
 import { ProjectView } from "./ProjectView";
+import { audioContext } from "./session";
+
+function WarnWhileBatchRuns({ batch }: { batch: BatchMaker }) {
+  const { running } = useBatchSnapshot(batch);
+  useEffect(() => {
+    if (!running) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [running]);
+  return null;
+}
 
 export function App() {
   const [store, setStore] = useState<ProjectStore | null>(null);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
+  const batch = useMemo(() => (store ? new BatchMaker(store, audioContext) : null), [store]);
+
+  useEffect(() => () => batch?.dispose(), [batch]);
 
   useEffect(() => {
     let opened: ProjectStore | null = null;
@@ -26,9 +43,10 @@ export function App() {
         <span className="logo"><span className="red">Beatmap</span> <span className="blue">Studio</span></span>
       </header>
       {storeError && <main className="page"><div className="error-banner" role="alert">{storeError}</div></main>}
-      {store && (openProjectId
+      {batch && <WarnWhileBatchRuns batch={batch} />}
+      {store && batch && (openProjectId
         ? <ProjectView store={store} projectId={openProjectId} onClose={() => setOpenProjectId(null)} />
-        : <Dashboard store={store} onOpen={setOpenProjectId} />)}
+        : <Dashboard store={store} batch={batch} onOpen={setOpenProjectId} />)}
     </>
   );
 }

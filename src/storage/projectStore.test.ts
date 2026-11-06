@@ -19,6 +19,13 @@ describe("ProjectStore", () => {
     expect(await store.loadProject("missing")).toBeNull();
   });
 
+  it("counts notes across every difficulty in the summary", async () => {
+    const project = newProject("n", "Mapped", 1);
+    const note = { id: "x", beat: 4, x: 0, y: 0, color: "red" as const, direction: "down" as const };
+    await store.saveProject({ ...project, charts: { ...project.charts, Easy: { ...project.charts.Easy, notes: [note] }, Expert: { ...project.charts.Expert, notes: [note, { ...note, id: "y" }] } } });
+    expect((await store.listProjects()).find((summary) => summary.id === "n")?.noteCount).toBe(3);
+  });
+
   it("renames by saving the changed project", async () => {
     const project = newProject("a", "Draft", 1);
     await store.saveProject(project);
