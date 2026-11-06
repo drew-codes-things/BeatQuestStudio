@@ -31,6 +31,7 @@ const MAX_NOTE_JUMP_SPEED = 30;
 const MIN_CHAIN_SEGMENTS = 2;
 const FAST_GAP_FACTOR = 0.5;
 const EARLY_OBJECT_SECONDS = 1;
+export const DRIFT_WARNING_MS = 25;
 
 const DOWN_SWINGS: ReadonlySet<CutDirection> = new Set(["down", "downLeft", "downRight"]);
 const UP_SWINGS: ReadonlySet<CutDirection> = new Set(["up", "upLeft", "upRight"]);
@@ -225,6 +226,10 @@ function checkProject(project: Project): Issue[] {
   const issues: Issue[] = [];
   if (!project.song) issues.push(issue("no-song", "error", null, null, "Import a song before exporting."));
   else if (!project.song.title.trim()) issues.push(issue("no-title", "warning", null, null, "The song has no title; the project name will be used."));
+  const drift = project.song?.beatDriftMs ?? null;
+  if (drift !== null && drift > DRIFT_WARNING_MS) {
+    issues.push(issue("beat-drift", "warning", null, null, `The beat grid is up to ${Math.round(drift)} ms away from the music in places. The song's tempo may change; check the grid against the waveform before mapping.`));
+  }
   const bpmProblem = validateBpm(project.timing.bpm);
   if (bpmProblem) issues.push(issue("bpm", "error", null, null, bpmProblem));
   const empty = DIFFICULTIES.filter((difficulty) => chartObjectCount(project.charts[difficulty]) === 0);

@@ -8,7 +8,7 @@ function note(id: string, beat: number, x: number, y: number, color: Note["color
 
 function projectWithSong(): Project {
   const project = newProject("p", "Test", 0);
-  project.song = { title: "Song", subTitle: "", artist: "Artist", mapper: "Drew", fileName: "song.ogg", durationSeconds: 60, previewStartSeconds: 10, previewDurationSeconds: 10 };
+  project.song = { title: "Song", subTitle: "", artist: "Artist", mapper: "Drew", fileName: "song.ogg", durationSeconds: 60, previewStartSeconds: 10, previewDurationSeconds: 10, beatDriftMs: 2 };
   return project;
 }
 
@@ -29,6 +29,14 @@ describe("project checks", () => {
     const issues = validateProject(project);
     expect(issues.filter((found) => found.code === "empty").map((found) => found.difficulty)).toEqual(["Easy", "Normal", "Hard"]);
     expect(hasErrors(issues)).toBe(false);
+  });
+
+  it("warns when the beat grid drifts away from the music", () => {
+    const project = projectWithSong();
+    project.charts.Expert.notes.push(note("a", 4, 1, 0, "red"));
+    expect(validateProject(project).some((found) => found.code === "beat-drift")).toBe(false);
+    project.song!.beatDriftMs = 40;
+    expect(validateProject(project).find((found) => found.code === "beat-drift")?.message).toMatch(/40 ms/);
   });
 
   it("warns when an easier difficulty has more notes", () => {

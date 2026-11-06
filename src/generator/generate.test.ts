@@ -31,7 +31,7 @@ const charts = Object.fromEntries(DIFFICULTIES.map((difficulty) => [difficulty, 
 function projectWith(difficulty: Difficulty): Project {
   const project = newProject("p", "Generated", 0);
   project.timing = input.timing;
-  project.song = { title: "Clicks", subTitle: "", artist: "Test", mapper: "Test", fileName: "clicks.wav", durationSeconds: DURATION, previewStartSeconds: 0, previewDurationSeconds: 10 };
+  project.song = { title: "Clicks", subTitle: "", artist: "Test", mapper: "Test", fileName: "clicks.wav", durationSeconds: DURATION, previewStartSeconds: 0, previewDurationSeconds: 10, beatDriftMs: null };
   project.charts[difficulty] = charts[difficulty];
   return project;
 }
@@ -46,7 +46,8 @@ describe("generateChart", () => {
   it.each(DIFFICULTIES)("keeps %s on its own timing grid and gaps", (difficulty) => {
     const profile = DIFFICULTY_PROFILES[difficulty];
     const notes = charts[difficulty].notes;
-    for (const note of notes) expect(note.beat * profile.divisionsPerBeat).toBeCloseTo(Math.round(note.beat * profile.divisionsPerBeat), 6);
+    const onGrid = (beat: number, divisions: number | null) => divisions !== null && Math.abs(beat * divisions - Math.round(beat * divisions)) < 1e-6;
+    for (const note of notes) expect(onGrid(note.beat, profile.divisionsPerBeat) || onGrid(note.beat, profile.tripletDivisionsPerBeat)).toBe(true);
     const beats = [...new Set(notes.map((note) => note.beat))];
     for (let index = 1; index < beats.length; index += 1) expect(beats[index]! - beats[index - 1]!).toBeGreaterThanOrEqual(profile.minGapBeats - 1e-9);
   });
@@ -92,6 +93,17 @@ describe("generateChart", () => {
     const other = generateChart(input, "Hard", "other", counter());
     expect(again).toEqual(charts.Hard);
     expect(other.notes.map((note) => [note.beat, note.x, note.y, note.direction])).not.toEqual(charts.Hard.notes.map((note) => [note.beat, note.x, note.y, note.direction]));
+  });
+
+  it("follows a triplet rhythm in Hard and Expert instead of forcing it onto sixteenths", () => {
+    const tripletTrack = makeClickTrack({ bpm: BPM * 3, offsetSeconds: OFFSET, durationSeconds: 40, sampleRate: SAMPLE_RATE, accentEvery: 3, noiseLevel: 0.02 });
+    const analysis = analyseSong([tripletTrack], SAMPLE_RATE);
+    const tripletInput: GeneratorInput = { timing: { bpm: BPM, offsetSeconds: OFFSET }, durationSeconds: analysis.durationSeconds, onsets: analysis.onsets, energy: analysis.energy };
+    for (const difficulty of ["Hard", "Expert"] as const) {
+      const offBeats = generateChart(tripletInput, difficulty, "seed", counter()).notes.map((note) => note.beat % 1).filter((fraction) => fraction > 1e-6);
+      expect(offBeats.length).toBeGreaterThan(5);
+      for (const fraction of offBeats) expect(Math.min(Math.abs(fraction - 1 / 3), Math.abs(fraction - 2 / 3))).toBeLessThan(1e-6);
+    }
   });
 
   it("makes nothing for a silent song", () => {

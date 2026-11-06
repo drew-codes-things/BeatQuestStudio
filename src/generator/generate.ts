@@ -24,6 +24,8 @@ const FILLER_SCORE = 0.05;
 const STRONG_HIT = 0.55;
 const TAIL_SECONDS = 1;
 const LEAD_IN_SECONDS = 2;
+const GRID_MATCH_SECONDS = 0.02;
+const GRID_ONSET_MIN_STRENGTH = 0.2;
 const REST_FOR_WALL_BEATS = 4;
 const REST_FOR_BOMB_BEATS = 2;
 const FULL_HEIGHT = 5;
@@ -69,9 +71,9 @@ function onsetScore(onsets: readonly Onset[], seconds: number, window: number): 
   return best;
 }
 
-function candidateScore(input: GeneratorInput, profile: DifficultyProfile, beat: number): number {
+function candidateScore(input: GeneratorInput, divisionsPerBeat: number, beat: number): number {
   const seconds = beatToSeconds(beat, input.timing);
-  const window = Math.min(ONSET_WINDOW_SECONDS, (secondsPerBeat(input.timing) / profile.divisionsPerBeat) / 2);
+  const window = Math.min(ONSET_WINDOW_SECONDS, (secondsPerBeat(input.timing) / divisionsPerBeat) / 2);
   let score = onsetScore(input.onsets, seconds, window);
   const energy = energyAt(input.energy, seconds);
   if (score === 0 && Number.isInteger(beat) && energy > FILLER_ENERGY) score = FILLER_SCORE;
@@ -81,10 +83,29 @@ function candidateScore(input: GeneratorInput, profile: DifficultyProfile, beat:
   return score;
 }
 
+function gridMatches(input: GeneratorInput, barStart: number, divisionsPerBeat: number): number {
+  const from = beatToSeconds(barStart, input.timing);
+  const to = beatToSeconds(barStart + BEATS_PER_BAR, input.timing);
+  let matches = 0;
+  for (const onset of input.onsets) {
+    if (onset.seconds < from || onset.seconds >= to || onset.strength < GRID_ONSET_MIN_STRENGTH) continue;
+    const beat = secondsToBeat(onset.seconds, input.timing);
+    const nearest = Math.round(beat * divisionsPerBeat) / divisionsPerBeat;
+    if (Math.abs(beatToSeconds(nearest, input.timing) - onset.seconds) <= GRID_MATCH_SECONDS) matches += 1;
+  }
+  return matches;
+}
+
+export function barDivisions(input: GeneratorInput, profile: DifficultyProfile, barStart: number): number {
+  if (profile.tripletDivisionsPerBeat === null) return profile.divisionsPerBeat;
+  const straight = gridMatches(input, barStart, profile.divisionsPerBeat);
+  const triplet = gridMatches(input, barStart, profile.tripletDivisionsPerBeat);
+  return triplet > straight ? profile.tripletDivisionsPerBeat : profile.divisionsPerBeat;
+}
+
 function chooseHits(input: GeneratorInput, profile: DifficultyProfile): Hit[] {
   const firstBeat = Math.max(0, Math.ceil(secondsToBeat(LEAD_IN_SECONDS, input.timing)));
   const lastBeat = Math.floor(secondsToBeat(input.durationSeconds - TAIL_SECONDS, input.timing));
-  const step = 1 / profile.divisionsPerBeat;
   const barSeconds = BEATS_PER_BAR * secondsPerBeat(input.timing);
   const hits: Hit[] = [];
   for (let barStart = firstBeat - (firstBeat % BEATS_PER_BAR); barStart <= lastBeat; barStart += BEATS_PER_BAR) {
@@ -92,11 +113,13 @@ function chooseHits(input: GeneratorInput, profile: DifficultyProfile): Hit[] {
     if (energy < SILENT_ENERGY) continue;
     const energyFactor = MIN_ENERGY_FACTOR + (1 - MIN_ENERGY_FACTOR) * energy;
     const target = Math.max(1, Math.round(profile.notesPerSecondAtFullEnergy * energyFactor * barSeconds));
+    const divisions = barDivisions(input, profile, barStart);
     const candidates: Hit[] = [];
-    for (let beat = Math.max(barStart, firstBeat); beat < barStart + BEATS_PER_BAR && beat <= lastBeat; beat += step) {
-      const rounded = Math.round(beat * profile.divisionsPerBeat) / profile.divisionsPerBeat;
-      const strength = candidateScore(input, profile, rounded);
-      if (strength > 0) candidates.push({ beat: rounded, strength });
+    for (let step = 0; step < BEATS_PER_BAR * divisions; step += 1) {
+      const beat = barStart + step / divisions;
+      if (beat < firstBeat || beat > lastBeat) continue;
+      const strength = candidateScore(input, divisions, beat);
+      if (strength > 0) candidates.push({ beat, strength });
     }
     candidates.sort((left, right) => right.strength - left.strength || left.beat - right.beat);
     const chosen: Hit[] = [];

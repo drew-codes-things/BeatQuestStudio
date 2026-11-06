@@ -2,6 +2,7 @@ import type { Difficulty } from "../core/model";
 
 export interface DifficultyProfile {
   divisionsPerBeat: number;
+  tripletDivisionsPerBeat: number | null;
   minGapBeats: number;
   minSameHandGapBeats: number;
   notesPerSecondAtFullEnergy: number;
@@ -17,6 +18,7 @@ export interface DifficultyProfile {
 export const DIFFICULTY_PROFILES: Record<Difficulty, DifficultyProfile> = {
   Easy: {
     divisionsPerBeat: 1,
+    tripletDivisionsPerBeat: null,
     minGapBeats: 1,
     minSameHandGapBeats: 2,
     notesPerSecondAtFullEnergy: 1.1,
@@ -30,6 +32,7 @@ export const DIFFICULTY_PROFILES: Record<Difficulty, DifficultyProfile> = {
   },
   Normal: {
     divisionsPerBeat: 2,
+    tripletDivisionsPerBeat: null,
     minGapBeats: 0.5,
     minSameHandGapBeats: 1,
     notesPerSecondAtFullEnergy: 1.9,
@@ -43,6 +46,7 @@ export const DIFFICULTY_PROFILES: Record<Difficulty, DifficultyProfile> = {
   },
   Hard: {
     divisionsPerBeat: 2,
+    tripletDivisionsPerBeat: 3,
     minGapBeats: 0.5,
     minSameHandGapBeats: 0.75,
     notesPerSecondAtFullEnergy: 2.9,
@@ -56,6 +60,7 @@ export const DIFFICULTY_PROFILES: Record<Difficulty, DifficultyProfile> = {
   },
   Expert: {
     divisionsPerBeat: 4,
+    tripletDivisionsPerBeat: 3,
     minGapBeats: 0.25,
     minSameHandGapBeats: 0.5,
     notesPerSecondAtFullEnergy: 4.3,

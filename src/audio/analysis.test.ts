@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyseSong, computePeaks, energyAt, energyCurve, mixToMono } from "./analysis";
-import { makeClickTrack } from "./testSignals";
+import { makeBandTrack, makeClickTrack } from "./testSignals";
 
 const SAMPLE_RATE = 22050;
 
@@ -14,10 +14,43 @@ describe("tempo and offset", () => {
     const samples = makeClickTrack({ bpm, offsetSeconds, durationSeconds: 40, sampleRate: SAMPLE_RATE, accentEvery: 4, noiseLevel: 0.02 });
     const analysis = analyseSong([samples], SAMPLE_RATE);
     expect(analysis.tempo.bpm).toBeCloseTo(bpm, 0);
-    expect(Math.abs(analysis.tempo.bpm - bpm)).toBeLessThan(0.15);
+    expect(Math.abs(analysis.tempo.bpm - bpm)).toBeLessThan(0.01);
     const period = 60 / bpm;
     const phaseError = Math.abs(((analysis.tempo.offsetSeconds - offsetSeconds) % period + period * 1.5) % period - period / 2);
-    expect(phaseError).toBeLessThan(0.025);
+    expect(phaseError * 1000).toBeLessThan(2);
+  });
+
+  it.each([
+    { bpm: 128, firstDownbeatSeconds: 0.437 },
+    { bpm: 95, firstDownbeatSeconds: 1.21 },
+    { bpm: 172, firstDownbeatSeconds: 0.08 },
+    { bpm: 117.5, firstDownbeatSeconds: 0.6 },
+  ])("locks onto the beat and the bar of a band at $bpm BPM", ({ bpm, firstDownbeatSeconds }) => {
+    const samples = makeBandTrack({ bpm, firstDownbeatSeconds, durationSeconds: 60, sampleRate: 44100, jitterMs: 6 });
+    const { tempo } = analyseSong([samples], 44100);
+    expect(Math.abs(tempo.bpm - bpm)).toBeLessThan(0.05);
+    const halfBar = (2 * 60) / bpm;
+    const kickBeatError = ((tempo.offsetSeconds - firstDownbeatSeconds) % halfBar + halfBar * 1.5) % halfBar - halfBar / 2;
+    expect(Math.abs(kickBeatError) * 1000).toBeLessThan(3);
+    expect(tempo.driftMs).toBeLessThan(5);
+  });
+
+  it("puts beat 1 on the bar's downbeat when the downbeat is distinct", () => {
+    const bpm = 124;
+    const samples = makeBandTrack({ bpm, firstDownbeatSeconds: 0.73, durationSeconds: 60, sampleRate: 44100, jitterMs: 4, kickOnThree: false });
+    const { tempo } = analyseSong([samples], 44100);
+    const bar = (4 * 60) / bpm;
+    const barError = ((tempo.offsetSeconds - 0.73) % bar + bar * 1.5) % bar - bar / 2;
+    expect(Math.abs(barError) * 1000).toBeLessThan(3);
+  });
+
+  it("reports drift when the tempo changes part way through", () => {
+    const first = makeBandTrack({ bpm: 120, firstDownbeatSeconds: 0.5, durationSeconds: 30, sampleRate: 22050, jitterMs: 0 });
+    const second = makeBandTrack({ bpm: 126, firstDownbeatSeconds: 0, durationSeconds: 30, sampleRate: 22050, jitterMs: 0 });
+    const joined = new Float32Array(first.length + second.length);
+    joined.set(first);
+    joined.set(second, first.length);
+    expect(analyseSong([joined], 22050).tempo.driftMs).toBeGreaterThan(25);
   });
 
   it("finds one onset per click", () => {

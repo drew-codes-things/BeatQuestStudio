@@ -41,6 +41,39 @@ describe("ProjectStore", () => {
     expect(new Uint8Array((await store.loadAudio("b"))!.bytes)).toEqual(new Uint8Array([1, 2, 3]));
   });
 
+  it("stores, copies and deletes the cover with the project", async () => {
+    await store.saveProject(newProject("a", "Song", 1));
+    await store.saveCover({ projectId: "a", fileName: "cover.png", mimeType: "image/png", bytes: new Uint8Array([9]).buffer });
+    await store.duplicateProject("a", "b", "Copy", 2);
+    expect((await store.loadCover("b"))?.fileName).toBe("cover.png");
+    await store.deleteProject("a");
+    expect(await store.loadCover("a")).toBeNull();
+    expect(await store.loadCover("b")).not.toBeNull();
+  });
+
+  it("upgrades a version 1 database without losing projects", async () => {
+    const factory = new IDBFactory();
+    const v1 = factory.open("beatmap-studio", 1);
+    v1.onupgradeneeded = () => {
+      v1.result.createObjectStore("projects", { keyPath: "id" });
+      v1.result.createObjectStore("audio", { keyPath: "projectId" });
+      v1.result.createObjectStore("backups", { keyPath: "id", autoIncrement: true }).createIndex("byProject", "projectId");
+    };
+    await new Promise<void>((resolve, reject) => {
+      v1.onsuccess = () => {
+        const transaction = v1.result.transaction("projects", "readwrite");
+        transaction.objectStore("projects").put(newProject("old", "From v1", 1));
+        transaction.oncomplete = () => { v1.result.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+      v1.onerror = () => reject(v1.error);
+    });
+    const upgraded = await ProjectStore.open(factory);
+    expect((await upgraded.loadProject("old"))?.name).toBe("From v1");
+    expect(await upgraded.loadCover("old")).toBeNull();
+    upgraded.close();
+  });
+
   it("refuses to duplicate a project that does not exist", async () => {
     await expect(store.duplicateProject("ghost", "b", "x", 1)).rejects.toThrow(/does not exist/);
   });

@@ -86,6 +86,7 @@ export interface SongInfo {
   durationSeconds: number;
   previewStartSeconds: number;
   previewDurationSeconds: number;
+  beatDriftMs: number | null;
 }
 
 export interface Project {

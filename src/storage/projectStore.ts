@@ -1,14 +1,22 @@
 import type { Project } from "../core/model";
 
 const DATABASE_NAME = "beatmap-studio";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const PROJECTS = "projects";
 const AUDIO = "audio";
 const BACKUPS = "backups";
+const COVERS = "covers";
 const BACKUPS_BY_PROJECT = "byProject";
 export const MAX_BACKUPS_PER_PROJECT = 20;
 
 export interface StoredAudio {
+  projectId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: ArrayBuffer;
+}
+
+export interface StoredCover {
   projectId: string;
   fileName: string;
   mimeType: string;
@@ -45,11 +53,14 @@ function transactionDone(transaction: IDBTransaction, context: string): Promise<
   });
 }
 
-function createSchema(database: IDBDatabase): void {
-  database.createObjectStore(PROJECTS, { keyPath: "id" });
-  database.createObjectStore(AUDIO, { keyPath: "projectId" });
-  const backups = database.createObjectStore(BACKUPS, { keyPath: "id", autoIncrement: true });
-  backups.createIndex(BACKUPS_BY_PROJECT, "projectId");
+function upgradeSchema(database: IDBDatabase, oldVersion: number): void {
+  if (oldVersion < 1) {
+    database.createObjectStore(PROJECTS, { keyPath: "id" });
+    database.createObjectStore(AUDIO, { keyPath: "projectId" });
+    const backups = database.createObjectStore(BACKUPS, { keyPath: "id", autoIncrement: true });
+    backups.createIndex(BACKUPS_BY_PROJECT, "projectId");
+  }
+  if (oldVersion < 2) database.createObjectStore(COVERS, { keyPath: "projectId" });
 }
 
 export class ProjectStore {
@@ -57,7 +68,7 @@ export class ProjectStore {
 
   static async open(factory: IDBFactory = indexedDB): Promise<ProjectStore> {
     const request = factory.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onupgradeneeded = () => createSchema(request.result);
+    request.onupgradeneeded = (event) => upgradeSchema(request.result, event.oldVersion);
     const database = await requestToPromise(request, "opening the project database");
     return new ProjectStore(database);
   }
@@ -87,9 +98,10 @@ export class ProjectStore {
   }
 
   async deleteProject(id: string): Promise<void> {
-    const transaction = this.database.transaction([PROJECTS, AUDIO, BACKUPS], "readwrite");
+    const transaction = this.database.transaction([PROJECTS, AUDIO, COVERS, BACKUPS], "readwrite");
     transaction.objectStore(PROJECTS).delete(id);
     transaction.objectStore(AUDIO).delete(id);
+    transaction.objectStore(COVERS).delete(id);
     const backupKeys = await requestToPromise(transaction.objectStore(BACKUPS).index(BACKUPS_BY_PROJECT).getAllKeys(id), `finding backups of ${id}`);
     for (const key of backupKeys) transaction.objectStore(BACKUPS).delete(key);
     await transactionDone(transaction, `deleting project ${id}`);
@@ -107,6 +119,18 @@ export class ProjectStore {
     return audio ?? null;
   }
 
+  async saveCover(cover: StoredCover): Promise<void> {
+    const transaction = this.database.transaction(COVERS, "readwrite");
+    transaction.objectStore(COVERS).put(cover);
+    await transactionDone(transaction, `saving cover for ${cover.projectId}`);
+  }
+
+  async loadCover(projectId: string): Promise<StoredCover | null> {
+    const store = this.database.transaction(COVERS, "readonly").objectStore(COVERS);
+    const cover = await requestToPromise(store.get(projectId) as IDBRequest<StoredCover | undefined>, `loading cover for ${projectId}`);
+    return cover ?? null;
+  }
+
   async duplicateProject(sourceId: string, newId: string, newName: string, now: number): Promise<Project> {
     const source = await this.loadProject(sourceId);
     if (!source) throw new Error(`cannot duplicate project ${sourceId}: it does not exist`);
@@ -114,6 +138,8 @@ export class ProjectStore {
     await this.saveProject(copy);
     const audio = await this.loadAudio(sourceId);
     if (audio) await this.saveAudio({ ...audio, projectId: newId });
+    const cover = await this.loadCover(sourceId);
+    if (cover) await this.saveCover({ ...cover, projectId: newId });
     return copy;
   }
 
