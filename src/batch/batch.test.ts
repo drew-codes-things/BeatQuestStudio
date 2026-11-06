@@ -4,7 +4,7 @@ import { analyseSong } from "../audio/analysis";
 import { makeClickTrack } from "../audio/testSignals";
 import { chartObjectCount, newProject } from "../core/model";
 import { generateCharts } from "../generator/generate";
-import { titleFromFileName, withImportedSong } from "../import/songImport";
+import { withImportedSong } from "../import/songImport";
 import { hasStorageRoom, importRejection, MAX_IMPORT_BYTES, MAX_SONG_SECONDS, songLengthRejection } from "./limits";
 import { BatchQueue, type BatchSnapshot } from "./queue";
 import { ZipPartWriter } from "./zipParts";
@@ -217,23 +217,19 @@ describe("ZipPartWriter", () => {
 describe("song import helpers", () => {
   const analysis = analyseSong([makeClickTrack({ bpm: 120, offsetSeconds: 0.5, durationSeconds: 30, sampleRate: 22050, accentEvery: 4, noiseLevel: 0.01 })], 22050);
 
-  it("titles a project from the file name", () => {
-    expect(titleFromFileName("My_Song.final.mp3")).toBe("My Song.final");
-  });
-
   it("fills timing and song details from the analysis and keeps a title already set", () => {
-    const fresh = withImportedSong(newProject("p", "Untitled", 1), { storedFileName: "clip.ogg", sourceName: "Great_Tune.mp4", analysis }, 5);
+    const fresh = withImportedSong(newProject("p", "Untitled", 1), { storedFileName: "clip.ogg", identity: { title: "Great Tune", artist: "" }, analysis }, 5);
     expect(fresh.timing.bpm).toBeCloseTo(120, 1);
     expect(fresh.song?.title).toBe("Great Tune");
     expect(fresh.song?.fileName).toBe("clip.ogg");
     expect(fresh.updatedAt).toBe(5);
     const renamed = { ...fresh, song: { ...fresh.song!, title: "Kept" } };
-    expect(withImportedSong(renamed, { storedFileName: "b.mp3", sourceName: "b.mp3", analysis }, 6).song?.title).toBe("Kept");
+    expect(withImportedSong(renamed, { storedFileName: "b.mp3", identity: { title: "b", artist: "" }, analysis }, 6).song?.title).toBe("Kept");
   });
 
   it("generates only the chosen difficulties", () => {
     let next = 0;
-    const charts = generateCharts(withImportedSong(newProject("p", "x", 1), { storedFileName: "a.wav", sourceName: "a.wav", analysis }, 2).timing, analysis, ["Easy", "Expert"], "seed", () => `id${next++}`);
+    const charts = generateCharts(withImportedSong(newProject("p", "x", 1), { storedFileName: "a.wav", identity: { title: "a", artist: "" }, analysis }, 2).timing, analysis, ["Easy", "Expert"], "seed", () => `id${next++}`);
     expect(Object.keys(charts).sort()).toEqual(["Easy", "Expert"]);
     expect(chartObjectCount(charts.Easy!)).toBeGreaterThan(0);
     expect(charts.Expert!.notes.length).toBeGreaterThan(charts.Easy!.notes.length);

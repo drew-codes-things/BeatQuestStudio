@@ -1,7 +1,7 @@
 import { AudioWorkerClient } from "../audio/workerProtocol";
 import { DIFFICULTIES, newProject, type Project } from "../core/model";
 import { generateCharts } from "../generator/generate";
-import { type ReadSong, readSongFile, titleFromFileName, withImportedSong } from "../import/songImport";
+import { type ReadSong, readSongFile, storeAutoCover, withImportedSong } from "../import/songImport";
 import type { ProjectStore } from "../storage/projectStore";
 import { BATCH_ITEM_TIMEOUT_MS, BATCH_REST_MS, hasStorageRoom, importRejection } from "./limits";
 import { BatchQueue } from "./queue";
@@ -80,19 +80,21 @@ export class BatchMaker {
   private async makeMap(file: File): Promise<string> {
     const startedIn = this.generation;
     const read = await readSongFile(file, this.context(), this.workerClient());
-    const title = titleFromFileName(file.name);
+    const { title } = read.identity;
     const now = Date.now();
-    const project = withImportedSong(newProject(crypto.randomUUID(), title, now), { storedFileName: read.audio.fileName, sourceName: file.name, analysis: read.analysis }, now);
+    const project = withImportedSong(newProject(crypto.randomUUID(), title, now), { storedFileName: read.audio.fileName, identity: read.identity, analysis: read.analysis }, now);
     const charts = generateCharts(project.timing, read.analysis, DIFFICULTIES, title, () => crypto.randomUUID());
     if (startedIn !== this.generation) throw new Error(`"${file.name}" was abandoned after taking too long`);
-    await this.saveProjectWithAudio({ ...project, charts: { ...project.charts, ...charts } }, read.audio);
+    await this.saveProjectWithAudio({ ...project, charts: { ...project.charts, ...charts } }, read);
     const counts = DIFFICULTIES.map((difficulty) => `${difficulty} ${charts[difficulty]?.notes.length ?? 0}`).join(", ");
-    return `${Math.round(project.timing.bpm * 100) / 100} BPM${read.strippedFromVideo ? ", sound taken from the video" : ""}: ${counts} notes`;
+    const named = read.identity.artist ? `${read.identity.artist} - ${title}` : title;
+    return `${named}, ${Math.round(project.timing.bpm * 100) / 100} BPM${read.strippedFromVideo ? ", sound taken from the video" : ""}: ${counts} notes`;
   }
 
-  private async saveProjectWithAudio(project: Project, audio: ReadSong["audio"]): Promise<void> {
+  private async saveProjectWithAudio(project: Project, read: ReadSong): Promise<void> {
     try {
-      await this.store.saveAudio({ projectId: project.id, ...audio });
+      await this.store.saveAudio({ projectId: project.id, ...read.audio });
+      await storeAutoCover(this.store, project.id, read);
       await this.store.saveProject(project);
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : String(cause);

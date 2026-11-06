@@ -8,7 +8,7 @@ import { AutoMapPanel } from "./AutoMapPanel";
 import { CheckPanel } from "./CheckPanel";
 import { Editor, type EditorFocus } from "./editor/Editor";
 import { errorMessage } from "./format";
-import { withImportedSong } from "../import/songImport";
+import { storeAutoCover, withImportedSong } from "../import/songImport";
 import { importSongFile, openSession, type SongSession } from "./session";
 import { SongPanel } from "./SongPanel";
 
@@ -108,10 +108,11 @@ export function ProjectView({ store, projectId, onClose }: ProjectViewProps) {
     try {
       const imported = await importSongFile(file, worker);
       await store.saveAudio({ projectId, ...imported.audio });
+      await storeAutoCover(store, projectId, imported);
       session?.player.dispose();
       setSession(imported.session);
       const { analysis } = imported.session;
-      change((project) => withImportedSong(project, { storedFileName: imported.audio.fileName, sourceName: file.name, analysis }, Date.now()));
+      change((project) => withImportedSong(project, { storedFileName: imported.audio.fileName, identity: imported.identity, analysis }, Date.now()));
     } catch (cause) {
       setSongError(errorMessage(cause));
     } finally {

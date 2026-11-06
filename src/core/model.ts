@@ -101,6 +101,7 @@ export interface Project {
 }
 
 export const DEFAULT_BPM = 120;
+export const DEFAULT_PROJECT_NAME = "Untitled map";
 
 export const DEFAULT_SETTINGS: Record<Difficulty, DifficultySettings> = {
   Easy: { noteJumpSpeed: 10, noteJumpOffset: 0 },

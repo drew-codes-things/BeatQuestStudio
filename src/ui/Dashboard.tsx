@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { BatchMaker } from "../batch/batchMaker";
 import { type ExportDestination, type ExportProgress, type ExportReport, exportProjects } from "../batch/exportMaps";
-import { newProject } from "../core/model";
+import { DEFAULT_PROJECT_NAME, newProject } from "../core/model";
 import { folderPickerAvailable, pickCustomLevelsFolder } from "../quest/folder";
 import type { Backup, ProjectStore, ProjectSummary } from "../storage/projectStore";
 import { BatchPanel, useBatchSnapshot } from "./BatchPanel";
@@ -14,7 +14,6 @@ interface DashboardProps {
   onOpen: (projectId: string) => void;
 }
 
-const DEFAULT_PROJECT_NAME = "Untitled map";
 
 function reportText(report: ExportReport, destination: ExportDestination["kind"]): string {
   const where = destination === "zip" ? ` in ${report.zipParts} zip ${report.zipParts === 1 ? "file" : "files"}` : " into CustomLevels";

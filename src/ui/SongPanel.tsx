@@ -59,14 +59,17 @@ export function SongPanel({ project, store, session, busy, onImport, onChange }:
   useEffect(() => {
     let url: string | null = null;
     store.loadCover(project.id).then((cover) => {
-      if (!cover) return;
+      if (!cover) {
+        setCoverUrl(null);
+        return;
+      }
       url = URL.createObjectURL(new Blob([cover.bytes], { type: cover.mimeType }));
       setCoverUrl(url);
     }).catch((cause: unknown) => setError(errorMessage(cause)));
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
-  }, [store, project.id]);
+  }, [store, project.id, song?.fileName]);
 
   const changeSong = (change: Partial<SongInfo>) => onChange((current) => current.song ? { ...current, song: { ...current.song, ...change } } : current);
   const changeTiming = (bpm: number, offsetSeconds: number) => {

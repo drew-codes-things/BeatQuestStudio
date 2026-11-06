@@ -15,9 +15,9 @@ const EXPORT_TIMEOUT_MS = 60_000;
 const BPM_TOLERANCE = 0.05;
 const OFFSET_TOLERANCE_MS = 5;
 const GRID_CELL_SIZE = 76;
-const FORMATS = ["song.wav", "song.mp3", "song.m4a", "song.opus", "song.ogg", "song.flac", "clip.mp4", "clip.webm", "clip.mov"];
+const VIDEO_PATTERN = /\.(mp4|webm|mov)$/;
 const OVERSIZE_BYTES = 300 * 1024 * 1024;
-const BATCH_FILES = ["song.opus", "clip.mp4", "song.flac", "huge.mp3", "notes.txt"];
+const BATCH_FILES = ["song.opus", "clip.mp4", "song.flac", "03_Test_Artist_-_Night_Drive_(Official_Video)_[HD].mp4", "huge.mp3", "notes.txt"];
 const BATCH_TIMEOUT_MS = 120_000;
 const EXPECTED_ZIP_FILES = ["EasyStandard.dat", "ExpertStandard.dat", "HardStandard.dat", "Info.dat", "NormalStandard.dat", "cover.png", "song.egg"];
 
@@ -108,7 +108,11 @@ async function importFixture(page, fileName) {
   const failure = await page.$eval('.error-banner[role="alert"]', (node) => node.textContent).catch(() => null);
   if (failure) throw new Error(`${fileName}: ${failure}`);
   await page.waitForFunction(() => !document.querySelector('[data-testid="grid-fit"]')?.textContent.includes("not measured"), { timeout: IMPORT_TIMEOUT_MS });
+  await page.waitForSelector("img.cover", { timeout: IMPORT_TIMEOUT_MS });
+  const fieldValue = (label) => page.$eval(`::-p-xpath(//label[span[text()="${label}"]]/input)`, (node) => node.value);
   return {
+    title: await fieldValue("Title"),
+    artist: await fieldValue("Artist"),
     bpm: Number(await page.$eval('[data-testid="bpm"]', (node) => node.value)),
     offsetMs: Number(await page.$eval('[data-testid="offset"]', (node) => node.value)),
     summary: await page.$eval('[data-testid="song-summary"]', (node) => node.textContent),
@@ -124,19 +128,24 @@ function beatErrorMs(offsetMs, expected) {
 
 async function runFormats(page, expected) {
   const results = [];
-  for (const fileName of FORMATS) {
+  for (const fileName of expected.files) {
     await openNewProject(page);
     const started = Date.now();
     const result = await importFixture(page, fileName);
     const errorMs = Math.round(beatErrorMs(result.offsetMs, expected) * 10) / 10;
     const seconds = (Date.now() - started) / 1000;
     results.push({ fileName, ...result, errorMs, seconds });
-    console.log(`format ${fileName}: ${result.bpm} BPM, offset ${result.offsetMs} ms, beat error ${errorMs} ms, ${result.summary}, ${seconds}s. ${result.gridFit}`);
+    console.log(`format ${fileName}: "${result.title}" by "${result.artist}", ${result.bpm} BPM, offset ${result.offsetMs} ms, beat error ${errorMs} ms, ${result.summary}, ${seconds}s. ${result.gridFit}`);
   }
   const wrong = results.filter((result) => Math.abs(result.bpm - expected.bpm) > BPM_TOLERANCE || Math.abs(result.errorMs) > OFFSET_TOLERANCE_MS);
   if (wrong.length > 0) throw new Error(`beat grid wrong for ${wrong.map((result) => result.fileName).join(", ")}`);
-  const videos = results.filter((result) => result.fileName.startsWith("clip."));
-  if (!videos.every((result) => result.summary.startsWith("clip.ogg"))) throw new Error("video imports did not keep only the sound as clip.ogg");
+  const videos = results.filter((result) => VIDEO_PATTERN.test(result.fileName));
+  if (!videos.every((result) => result.summary.split(" ")[0].endsWith(".ogg"))) throw new Error("video imports did not keep only the sound as .ogg");
+  const identityOf = (fileName) => results.find((result) => result.fileName === fileName);
+  for (const check of [expected.tagged, expected.messyVideo]) {
+    const found = identityOf(check.file);
+    if (found.title !== check.title || found.artist !== check.artist) throw new Error(`${check.file} was named "${found.title}" by "${found.artist}", expected "${check.title}" by "${check.artist}"`);
+  }
 }
 
 async function difficultyCounts(page) {
@@ -234,12 +243,17 @@ async function runExport(page, shoot, browser) {
   if (JSON.stringify(names) !== JSON.stringify(EXPECTED_ZIP_FILES)) throw new Error(`zip holds ${names.join(", ")}`);
   const info = JSON.parse(new TextDecoder().decode(files["Info.dat"]));
   const expert = JSON.parse(new TextDecoder().decode(files["ExpertStandard.dat"]));
+  const coverPath = join(DOWNLOAD_DIR, "cover.png");
+  writeFileSync(coverPath, files["cover.png"]);
+  const cover = execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_name,width,height", "-of", "csv=p=0", coverPath], { encoding: "utf8" }).trim();
+  if (cover !== "png,512,512") throw new Error(`cover.png is ${cover}`);
+  if (!zipName.includes("(Neon Skyline - ")) throw new Error(`zip folder "${zipName}" does not carry the song's real name`);
   const songPath = join(DOWNLOAD_DIR, "song.egg");
   writeFileSync(songPath, files["song.egg"]);
   const song = probeCodec(songPath);
   if (song.codec !== "vorbis") throw new Error(`song.egg is ${song.codec}, not vorbis`);
   const difficultyCount = info._difficultyBeatmapSets[0]._difficultyBeatmaps.length;
-  console.log(`export: ${zipName}, Info ${info._version} at ${info._beatsPerMinute} BPM, ${difficultyCount} difficulties, Expert v${expert.version} with ${expert.colorNotes.length} notes, song.egg vorbis ${song.durationSeconds.toFixed(2)}s`);
+  console.log(`export: ${zipName}, cover ${cover}, Info ${info._version} at ${info._beatsPerMinute} BPM, ${difficultyCount} difficulties, Expert v${expert.version} with ${expert.colorNotes.length} notes, song.egg vorbis ${song.durationSeconds.toFixed(2)}s`);
 }
 
 function writeBatchExtras() {
@@ -267,13 +281,14 @@ async function runBatch(page, shoot) {
   for (const row of rows) console.log(`batch ${row.status} ${row.label}: ${row.message}`);
   const progress = await page.$eval('[data-testid="batch-progress"]', (node) => node.textContent);
   console.log(`batch: ${progress} in ${(Date.now() - started) / 1000}s`);
-  if (!progress.includes("3 made, 0 failed, 2 skipped")) throw new Error(`batch result was "${progress}"`);
+  if (!progress.includes("4 made, 0 failed, 2 skipped")) throw new Error(`batch result was "${progress}"`);
   const byLabel = Object.fromEntries(rows.map((row) => [row.label, row]));
   if (!byLabel["huge.mp3"].message.includes("256 MB")) throw new Error("the oversize file was not stopped by the size limit");
   if (!byLabel["notes.txt"].message.includes("not an audio or video file")) throw new Error("the text file was not rejected");
+  if (!byLabel[BATCH_FILES[3]].message.startsWith("Test Artist - Night Drive,")) throw new Error(`the messy video was not renamed: ${byLabel[BATCH_FILES[3]].message}`);
   await shoot("07-batch");
-  await clickButton(page, "Select all with notes (4)");
-  await expectText(page, "4 selected");
+  await clickButton(page, "Select all with notes (5)");
+  await expectText(page, "5 selected");
   rmSync(DOWNLOAD_DIR, { recursive: true, force: true });
   mkdirSync(DOWNLOAD_DIR, { recursive: true });
   await page.click('[data-testid="export-many-zip"]');
@@ -284,13 +299,15 @@ async function runBatch(page, shoot) {
   await pause(500);
   const files = unzipSync(new Uint8Array(readFileSync(join(DOWNLOAD_DIR, zipName))));
   const folders = [...new Set(Object.keys(files).map((path) => path.split("/")[0]))];
-  if (folders.length !== 4) throw new Error(`expected 4 map folders, found ${folders.join(", ")}`);
+  if (folders.length !== 5) throw new Error(`expected 5 map folders, found ${folders.join(", ")}`);
   for (const folder of folders) {
     const info = JSON.parse(new TextDecoder().decode(files[`${folder}/Info.dat`]));
     const songPath = join(DOWNLOAD_DIR, "batch-song.egg");
     writeFileSync(songPath, files[`${folder}/song.egg`]);
     const song = probeCodec(songPath);
     if (song.codec !== "vorbis") throw new Error(`${folder}/song.egg is ${song.codec}`);
+    if (!files[`${folder}/cover.png`]) throw new Error(`${folder} has no cover.png`);
+    writeFileSync(join(DOWNLOAD_DIR, `cover-${folders.indexOf(folder)}.png`), files[`${folder}/cover.png`]);
     const difficulties = info._difficultyBeatmapSets[0]._difficultyBeatmaps.map((entry) => entry._difficulty).join("/");
     console.log(`export many: ${folder} at ${info._beatsPerMinute} BPM, ${difficulties}, song.egg vorbis ${song.durationSeconds.toFixed(1)}s`);
   }

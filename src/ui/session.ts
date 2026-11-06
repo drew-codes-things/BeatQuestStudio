@@ -1,6 +1,7 @@
 import type { SongAnalysis, WaveformPeaks } from "../audio/analysis";
 import { SongPlayer } from "../audio/player";
 import type { AudioWorkerClient } from "../audio/workerProtocol";
+import type { SongIdentity, SongTags } from "../import/songIdentity";
 import { decodeAndAnalyse, type DecodedSong, readSongFile } from "../import/songImport";
 import type { StoredAudio } from "../storage/projectStore";
 
@@ -15,6 +16,8 @@ export interface ImportedSong {
   audio: Omit<StoredAudio, "projectId">;
   session: SongSession;
   strippedFromVideo: boolean;
+  tags: SongTags;
+  identity: SongIdentity;
 }
 
 let sharedContext: AudioContext | null = null;
@@ -36,5 +39,5 @@ export async function openSession(bytes: ArrayBuffer, fileName: string, worker: 
 export async function importSongFile(file: File, worker: AudioWorkerClient): Promise<ImportedSong> {
   const context = audioContext();
   const read = await readSongFile(file, context, worker);
-  return { audio: read.audio, session: sessionFrom(context, read), strippedFromVideo: read.strippedFromVideo };
+  return { audio: read.audio, session: sessionFrom(context, read), strippedFromVideo: read.strippedFromVideo, tags: read.tags, identity: read.identity };
 }

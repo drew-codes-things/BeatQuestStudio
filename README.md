@@ -35,6 +35,11 @@ and nothing is uploaded anywhere.
   timeline, a 4 by 3 cell grid, a 3D preview, playback at 25% to 100% with note
   ticks, copy and paste, copy to another difficulty, mirror, swap colours, undo
   and redo, and keyboard shortcuts for all of it.
+- **Real names and covers.** Title and artist come from the file's tags, or
+  are tidied up from the file name, so
+  `03_Artist_-_Song_(Official_Video)_[HD].mp4` becomes "Song" by "Artist".
+  Every song gets a cover: its own album art, or a generated one, each with a
+  small DrewBeat badge. A cover you upload yourself is never replaced.
 - **Batch mode.** Add a pile of songs or a whole folder and every one becomes
   its own mapped project, worked through one at a time.
 - **Checks, not rules.** Problems such as vision blocks, fast resets or notes
@@ -146,8 +151,9 @@ pages. WebUSB and folder saving need Chrome or Edge on a desktop computer.
 `CHROME_PATH`) and needs `ffmpeg` and `ffprobe`. It makes a test song, encodes
 it to every supported format and checks each import finds 128 BPM with the
 beat within 5 ms. It then auto-maps, edits with undo and redo, exports, and
-checks the zip with ffprobe. Last, it runs a batch with a file that is too
-big and one that is not audio. Screenshots go to `smoke-screens/` (or
+checks the zip and its cover with ffprobe. A tagged MP3 with album art and a
+messily named video check the song names. Last, it runs a batch with a file
+that is too big and one that is not audio. Screenshots go to `smoke-screens/` (or
 `SMOKE_SCREENSHOT_DIR`).
 
 | Folder | Responsibility |
@@ -169,7 +175,9 @@ big and one that is not audio. Screenshots go to `smoke-screens/` (or
 
 USB install uses [Tango](https://github.com/yume-chan/ya-webadb) (MIT). Ogg
 Vorbis encoding uses [wasm-media-encoders](https://github.com/arseneyr/wasm-media-encoders)
-(MIT). Zips use [fflate](https://github.com/101arrowz/fflate) (MIT). The IBM
+(MIT). Zips use [fflate](https://github.com/101arrowz/fflate) (MIT). Song
+tags are read with [music-metadata](https://github.com/Borewit/music-metadata)
+(MIT). The IBM
 Plex fonts are under the SIL Open Font License (`src/ui/fonts/OFL.txt`).
 
 Beat Saber is a trademark of Beat Games. This project is not affiliated with
