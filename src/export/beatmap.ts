@@ -138,7 +138,7 @@ export function buildInfo(project: Project, coverFileName: string): Record<strin
   };
 }
 
-const UNSAFE_FOLDER_CHARACTERS = /[\\/:*?"<>|\u0000-\u001f]/g;
+const UNSAFE_FOLDER_CHARACTERS = /[^\p{L}\p{N} ()._,&+!-]/gu;
 const MAX_FOLDER_PART_LENGTH = 60;
 
 function safePart(text: string, fallback: string): string {

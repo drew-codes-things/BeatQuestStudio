@@ -64,6 +64,9 @@ describe("Info.dat", () => {
 describe("folder and zip", () => {
   it("makes a folder name the Quest file system accepts", () => {
     expect(mapFolderName(project())).toBe("abcdef (Song Title - Drew)");
+    const tricky = project();
+    tricky.song!.title = "It's $(rm -rf) `x`; Ünïcode/..";
+    expect(mapFolderName(tricky)).toBe("abcdef (Its (rm -rf) x Ünïcode - Drew)");
   });
 
   it("picks the cover file name from the upload", () => {
