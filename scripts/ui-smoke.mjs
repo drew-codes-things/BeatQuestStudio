@@ -198,8 +198,10 @@ async function runEditorFlow(page, shoot) {
   const before = await noteCount(page);
   await placeNoteFromGrid(page);
   await waitForNoteCount(page, before + 1);
+  await expectText(page, "1 selected");
   await pressWithControl(page, "z");
   await waitForNoteCount(page, before);
+  await expectText(page, "0 selected");
   await pressWithControl(page, "y");
   await waitForNoteCount(page, before + 1);
   console.log(`editor: placed a note from the grid (${before} to ${before + 1} notes), undo and redo worked`);

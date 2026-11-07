@@ -67,6 +67,12 @@ export function allObjects(chart: Chart): ChartObject[] {
   return [...chart.notes, ...chart.bombs, ...chart.walls, ...chart.arcs, ...chart.chains];
 }
 
+export function keepExistingIds(selection: Set<string>, chart: Chart): Set<string> {
+  const existing = new Set(allObjects(chart).map((object) => object.id));
+  const kept = [...selection].filter((id) => existing.has(id));
+  return kept.length === selection.size ? selection : new Set(kept);
+}
+
 export function addNote(chart: Chart, note: Note): Chart {
   return sortChart({ ...chart, notes: [...chart.notes, note] });
 }

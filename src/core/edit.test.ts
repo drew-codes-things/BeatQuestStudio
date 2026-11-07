@@ -5,6 +5,7 @@ import {
   copyToChart,
   findObjectAt,
   idsInBeatRange,
+  keepExistingIds,
   mirrorObjects,
   moveObjects,
   pasteClipboard,
@@ -144,5 +145,17 @@ describe("history", () => {
     let history = startHistory(0);
     for (let step = 1; step <= HISTORY_LIMIT + 50; step += 1) history = record(history, step);
     expect(history.past).toHaveLength(HISTORY_LIMIT);
+  });
+});
+
+describe("selection after undo", () => {
+  it("drops ids that are no longer in the chart", () => {
+    const chart = sample();
+    expect([...keepExistingIds(new Set(["a", "gone", "w"]), chart)].sort()).toEqual(["a", "w"]);
+  });
+
+  it("returns the same set when every id still exists", () => {
+    const selection = new Set(["a", "bomb"]);
+    expect(keepExistingIds(selection, sample())).toBe(selection);
   });
 });

@@ -6,6 +6,7 @@ import {
   copySelection,
   copyToChart,
   findObjectAt,
+  keepExistingIds,
   mirrorObjects,
   moveObjects,
   type ObjectMove,
@@ -78,6 +79,8 @@ export function Editor(props: EditorProps) {
   const timelineWidth = useRef(900);
 
   useEffect(() => setSelection(new Set()), [difficulty]);
+
+  useEffect(() => setSelection((current) => keepExistingIds(current, chart)), [chart]);
 
   useEffect(() => {
     if (!props.focus) return;
