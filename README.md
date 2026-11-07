@@ -31,6 +31,11 @@ and nothing is uploaded anywhere.
 - **Four real difficulties.** Easy, Normal, Hard and Expert are each drafted on
   their own from the song, never made by deleting notes from Expert. Hard and
   Expert switch to triplets in bars where the music does.
+- **Moves like a human map.** Where each note goes is learned from 43 curated
+  and ranked community maps: forehand and backhand always alternate,
+  downswings sit low and upswings start higher, angles and two-handed hits
+  follow how mappers actually place them. Density and note jump speed match
+  the typical map at each difficulty (see [How the auto-mapper compares](#how-the-auto-mapper-compares)).
 - **A full editor.** Notes, dots, bombs, walls, arcs and chains on a lane
   timeline, a 4 by 3 cell grid, a 3D preview, playback at 25% to 100% with note
   ticks, copy and paste, copy to another difficulty, mirror, swap colours, undo
@@ -140,6 +145,25 @@ pages. WebUSB and folder saving need Chrome or Edge on a desktop computer.
 
 ---
 
+## How the auto-mapper compares
+
+`scripts/compare-with-reference.ts` runs the auto-mapper on the songs of real
+maps and compares the result with the human map for the same song. On 41
+curated and ranked maps (medians, human / auto):
+
+| | Easy | Normal | Hard | Expert |
+|---|---|---|---|---|
+| Notes per second | 1.67 / 1.70 | 2.27 / 2.38 | 3.22 / 3.30 | 3.96 / 4.24 |
+| Forehand/backhand alternation | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| Downswings on the bottom row | 0.99 / 1.00 | 0.99 / 0.99 | 0.94 / 0.96 | 0.91 / 0.90 |
+| Upswings above the bottom row | 0.82 / 0.78 | 0.86 / 0.82 | 0.89 / 0.88 | 0.92 / 0.89 |
+| Two-handed hits | 0.07 / 0.10 | 0.11 / 0.13 | 0.12 / 0.14 | 0.15 / 0.19 |
+
+On 11 maps held back from learning, alternation stays at 1.00 for every
+difficulty and Hard and Expert density lands within 2% of the human map.
+`scripts/learn-flow.ts` rebuilds `src/generator/flowTable.json` from a folder
+of maps; only counts of moves are kept, never the maps themselves.
+
 ## Development
 
     npm test           # unit tests (Vitest)
@@ -161,7 +185,7 @@ that is too big and one that is not audio. Screenshots go to `smoke-screens/` (o
 | `src/core` | The map model, timing, editing operations and undo history. No browser APIs. |
 | `src/audio` | Decoding, waveform, tempo and beat-grid fitting, playback, the analysis worker. |
 | `src/import` | Reading a song or video into a project. |
-| `src/generator` | The auto-mapper, one profile per difficulty. |
+| `src/generator` | The auto-mapper: one profile per difficulty and the learned flow table. |
 | `src/validation` | Checks that report problems and never change the map. |
 | `src/export` | `Info.dat`, difficulty files, Ogg Vorbis encoding, covers and zips. |
 | `src/batch` | The batch queue, its limits, batch mapping and batch export. |
