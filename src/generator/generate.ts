@@ -1,8 +1,10 @@
 import { type Onset, type SongAnalysis, energyAt } from "../audio/analysis";
 import type { IdFactory } from "../core/edit";
 import { sortChart } from "../core/edit";
-import type { Bomb, Chart, CutDirection, Difficulty, Note, NoteColor, Timing, Wall } from "../core/model";
+import type { Bomb, Chart, Difficulty, Note, NoteColor, Timing, Wall } from "../core/model";
 import { beatToSeconds, secondsPerBeat, secondsToBeat } from "../core/timing";
+import { swingKind } from "./flowMetrics";
+import { type DifficultyFlow, FLOW_TABLE, type FlowState, fromRedFrame, gapBucket, parseStateKey, toRedFrame, transitionKey } from "./flowTable";
 import { DIFFICULTY_PROFILES, type DifficultyProfile } from "./profiles";
 import { chance, hashSeed, pickWeighted, type Random, seededRandom } from "./random";
 
@@ -15,13 +17,13 @@ export interface GeneratorInput {
 
 const BEATS_PER_BAR = 4;
 const SILENT_ENERGY = 0.08;
-const MIN_ENERGY_FACTOR = 0.3;
+const MIN_ENERGY_FACTOR = 0.5;
 const ONSET_WINDOW_SECONDS = 0.07;
 const WHOLE_BEAT_BONUS = 0.2;
 const DOWNBEAT_BONUS = 0.1;
 const FILLER_ENERGY = 0.35;
 const FILLER_SCORE = 0.05;
-const STRONG_HIT = 0.55;
+const STRONG_HIT = 0.3;
 const TAIL_SECONDS = 1;
 const LEAD_IN_SECONDS = 2;
 const GRID_MATCH_SECONDS = 0.02;
@@ -32,12 +34,13 @@ const FULL_HEIGHT = 5;
 const DODGE_WALL_BEATS = 2;
 const BOMB_ROW = 2;
 
-type Swing = "down" | "up";
 type Hand = NoteColor;
+type VerticalSwing = "down" | "up";
 
 interface HandState {
   lastBeat: number;
-  lastSwing: Swing;
+  last: FlowState | null;
+  lastSwing: VerticalSwing | null;
 }
 
 interface Hit {
@@ -45,14 +48,20 @@ interface Hit {
   strength: number;
 }
 
-const HAND_COLUMNS: Record<Hand, readonly [number, number]> = { red: [0, 1], blue: [3, 2] };
+type WeightedState = readonly [FlowState, number];
+
+const MIN_TRANSITION_SUPPORT = 12;
+const CROSSOVER_WINDOW_BEATS = 1;
+const TRANSITION_FLOOR = 0.02;
+const OUTER_COLUMNS: Record<Hand, number> = { red: 0, blue: 3 };
 
 export function generateChart(input: GeneratorInput, difficulty: Difficulty, seed: string, makeId: IdFactory): Chart {
   const profile = DIFFICULTY_PROFILES[difficulty];
   const random = seededRandom(hashSeed(`${seed}:${difficulty}`));
   const hits = chooseHits(input, profile);
   const walls = profile.wallsInRests ? restWalls(hits, input, makeId) : [];
-  const notes = assignHands(hits, profile, random, makeId);
+  const context: FlowContext = { flow: FLOW_TABLE.tiers[difficulty], secondsEachBeat: secondsPerBeat(input.timing), random };
+  const notes = assignHands(hits, profile, context, makeId);
   const dodgeWalls = dodgeWallsAround(notes, input, profile, random, makeId);
   const bombs = profile.bombsInRests ? restBombs(hits, input, makeId) : [];
   return sortChart({ notes, bombs, walls: [...walls, ...dodgeWalls], arcs: [], chains: [] });
@@ -142,11 +151,6 @@ function chooseHits(input: GeneratorInput, profile: DifficultyProfile): Hit[] {
   return hits;
 }
 
-function nextSwing(state: HandState, beat: number, profile: DifficultyProfile): Swing {
-  if (beat - state.lastBeat >= profile.restResetBeats) return "down";
-  return state.lastSwing === "down" ? "up" : "down";
-}
-
 function handIsFree(state: HandState, beat: number, profile: DifficultyProfile): boolean {
   return beat - state.lastBeat >= profile.minSameHandGapBeats - 1e-9;
 }
@@ -161,69 +165,130 @@ function pickHand(hands: Record<Hand, HandState>, beat: number, profile: Difficu
   return hands.red.lastBeat < hands.blue.lastBeat ? "red" : "blue";
 }
 
-function pickRow(swing: Swing, column: number, random: Random): number {
-  const isCenterColumn = column === 1 || column === 2;
-  const rows: (readonly [number, number])[] = swing === "down"
-    ? [[0, 0.55], [1, isCenterColumn ? 0 : 0.15], [2, 0.3]]
-    : [[0, 0.8], [1, isCenterColumn ? 0 : 0.2]];
-  return pickWeighted(random, rows);
+function oppositeSwing(swing: VerticalSwing | null): VerticalSwing | null {
+  if (swing === null) return null;
+  return swing === "down" ? "up" : "down";
 }
 
-function pickDirection(swing: Swing, hand: Hand, column: number, profile: DifficultyProfile, random: Random): CutDirection {
-  if (chance(random, profile.dotChance)) return "any";
-  if (!chance(random, profile.angledChance)) return swing;
-  const isOuter = column === 0 || column === 3;
-  const leansLeft = isOuter ? hand === "red" : chance(random, 0.5);
-  if (swing === "down") return leansLeft ? "downLeft" : "downRight";
-  return leansLeft ? "upLeft" : "upRight";
+function swingAfter(state: HandState, next: FlowState): VerticalSwing | null {
+  const kind = swingKind(next.direction);
+  return kind === "down" || kind === "up" ? kind : oppositeSwing(state.lastSwing);
 }
 
-function placeNote(hand: Hand, beat: number, swing: Swing, profile: DifficultyProfile, random: Random, makeId: IdFactory, row?: number): Note {
-  const [outer, inner] = HAND_COLUMNS[hand];
-  const x = chance(random, 0.55) ? inner : outer;
-  const y = row ?? pickRow(swing, x, random);
-  const safeY = (x === 1 || x === 2) && y === 1 ? 0 : y;
-  return { id: makeId(), beat, x, y: safeY, color: hand, direction: pickDirection(swing, hand, x, profile, random) };
+function keepsParity(state: HandState, next: FlowState): boolean {
+  const kind = swingKind(next.direction);
+  if (kind !== "down" && kind !== "up") return true;
+  return state.lastSwing !== kind;
 }
 
-function pointsRight(direction: CutDirection): boolean {
-  return direction === "downRight" || direction === "upRight" || direction === "right";
+function blocksVision(state: FlowState): boolean {
+  return state.y === 1 && (state.x === 1 || state.x === 2);
 }
 
-function pointsLeft(direction: CutDirection): boolean {
-  return direction === "downLeft" || direction === "upLeft" || direction === "left";
+function staysOnOwnSide(hand: Hand, next: FlowState, other: HandState, beat: number): boolean {
+  if (!other.last || beat - other.lastBeat > CROSSOVER_WINDOW_BEATS) return true;
+  if (next.x === other.last.x && next.y === other.last.y) return false;
+  return hand === "red" ? next.x <= other.last.x : next.x >= other.last.x;
 }
 
-function withoutInwardAngles(red: Note, blue: Note, swing: Swing): [Note, Note] {
-  const crosses = pointsRight(red.direction) || pointsLeft(blue.direction);
-  if (!crosses) return [red, blue];
-  return [{ ...red, direction: swing }, { ...blue, direction: swing }];
+function weightedKeys(entries: readonly (readonly [string, number])[], hand: Hand): WeightedState[] {
+  return entries.map(([key, count]) => [fromRedFrame(parseStateKey(key), hand), count] as const);
 }
 
-function assignHands(hits: readonly Hit[], profile: DifficultyProfile, random: Random, makeId: IdFactory): Note[] {
+function totalCount(entries: readonly (readonly [string, number])[]): number {
+  return entries.reduce((sum, [, count]) => sum + count, 0);
+}
+
+function nextOptions(flow: DifficultyFlow, hand: Hand, state: HandState, beat: number, secondsEachBeat: number): WeightedState[] {
+  if (!state.last) return weightedKeys(flow.starts, hand);
+  const previous = toRedFrame(state.last, hand);
+  const bucket = gapBucket((beat - state.lastBeat) * secondsEachBeat);
+  const specific = flow.transitions[transitionKey(bucket, previous)] ?? [];
+  const rows = totalCount(specific) >= MIN_TRANSITION_SUPPORT ? specific : flow.transitions[transitionKey("any", previous)] ?? [];
+  return weightedKeys(rows, hand);
+}
+
+function fallbackState(hand: Hand, state: HandState): FlowState {
+  const swing = oppositeSwing(state.lastSwing) ?? "down";
+  return { x: OUTER_COLUMNS[hand], y: swing === "down" ? 0 : 2, direction: swing };
+}
+
+function pickState(random: Random, options: readonly WeightedState[]): FlowState | null {
+  if (options.length === 0) return null;
+  return pickWeighted(random, options);
+}
+
+function sameState(left: FlowState, right: FlowState): boolean {
+  return left.x === right.x && left.y === right.y && left.direction === right.direction;
+}
+
+function transitionShare(options: readonly WeightedState[], target: FlowState): number {
+  const total = options.reduce((sum, [, count]) => sum + count, 0);
+  const match = options.find(([state]) => sameState(state, target));
+  return total === 0 || !match ? TRANSITION_FLOOR : Math.max(TRANSITION_FLOOR, match[1] / total);
+}
+
+function moveHand(state: HandState, beat: number, next: FlowState): HandState {
+  return { lastBeat: beat, last: next, lastSwing: swingAfter(state, next) };
+}
+
+function noteFrom(hand: Hand, beat: number, state: FlowState, makeId: IdFactory): Note {
+  return { id: makeId(), beat, x: state.x, y: state.y, color: hand, direction: state.direction };
+}
+
+interface FlowContext {
+  flow: DifficultyFlow;
+  secondsEachBeat: number;
+  random: Random;
+}
+
+function placeSingle(context: FlowContext, hands: Record<Hand, HandState>, hand: Hand, beat: number): FlowState {
+  const other = hands[hand === "red" ? "blue" : "red"];
+  const fits = ([candidate]: WeightedState) => keepsParity(hands[hand], candidate) && !blocksVision(candidate) && staysOnOwnSide(hand, candidate, other, beat);
+  const options = nextOptions(context.flow, hand, hands[hand], beat, context.secondsEachBeat).filter(fits);
+  return pickState(context.random, options) ?? fallbackState(hand, hands[hand]);
+}
+
+function placeDouble(context: FlowContext, hands: Record<Hand, HandState>, beat: number): [FlowState, FlowState] | null {
+  const redOptions = nextOptions(context.flow, "red", hands.red, beat, context.secondsEachBeat);
+  const blueOptions = nextOptions(context.flow, "blue", hands.blue, beat, context.secondsEachBeat);
+  const pairs = context.flow.doubles.flatMap(([redKey, blueKey, count]) => {
+    const red = parseStateKey(redKey);
+    const blue = fromRedFrame(parseStateKey(blueKey), "blue");
+    const fits = keepsParity(hands.red, red) && keepsParity(hands.blue, blue)
+      && red.x <= blue.x && !(red.x === blue.x && red.y === blue.y)
+      && !blocksVision(red) && !blocksVision(blue);
+    if (!fits) return [];
+    const weight = count * transitionShare(redOptions, red) * transitionShare(blueOptions, blue);
+    const pair: [FlowState, FlowState] = [red, blue];
+    return [[pair, weight] as const];
+  });
+  if (pairs.length === 0) return null;
+  return pickWeighted(context.random, pairs);
+}
+
+function assignHands(hits: readonly Hit[], profile: DifficultyProfile, context: FlowContext, makeId: IdFactory): Note[] {
   const hands: Record<Hand, HandState> = {
-    red: { lastBeat: -Infinity, lastSwing: "up" },
-    blue: { lastBeat: -Infinity, lastSwing: "up" },
+    red: { lastBeat: -Infinity, last: null, lastSwing: null },
+    blue: { lastBeat: -Infinity, last: null, lastSwing: null },
   };
   const notes: Note[] = [];
   for (const hit of hits) {
     const bothFree = handIsFree(hands.red, hit.beat, profile) && handIsFree(hands.blue, hit.beat, profile);
-    const redSwing = nextSwing(hands.red, hit.beat, profile);
-    const blueSwing = nextSwing(hands.blue, hit.beat, profile);
-    const wantsDouble = bothFree && redSwing === blueSwing && hit.strength >= STRONG_HIT && chance(random, profile.doubleChance);
-    if (wantsDouble) {
-      const red = placeNote("red", hit.beat, redSwing, profile, random, makeId);
-      const blue = placeNote("blue", hit.beat, blueSwing, profile, random, makeId, red.y);
-      notes.push(...withoutInwardAngles(red, blue, redSwing));
-      hands.red = { lastBeat: hit.beat, lastSwing: redSwing };
-      hands.blue = { lastBeat: hit.beat, lastSwing: blueSwing };
+    const wantsDouble = bothFree && hit.strength >= STRONG_HIT && chance(context.random, profile.doubleChance);
+    const double = wantsDouble ? placeDouble(context, hands, hit.beat) : null;
+    if (double) {
+      const [red, blue] = double;
+      notes.push(noteFrom("red", hit.beat, red, makeId), noteFrom("blue", hit.beat, blue, makeId));
+      hands.red = moveHand(hands.red, hit.beat, red);
+      hands.blue = moveHand(hands.blue, hit.beat, blue);
       continue;
     }
-    const hand = pickHand(hands, hit.beat, profile, random);
+    const hand = pickHand(hands, hit.beat, profile, context.random);
     if (!hand) continue;
-    const swing = nextSwing(hands[hand], hit.beat, profile);
-    notes.push(placeNote(hand, hit.beat, swing, profile, random, makeId));
-    hands[hand] = { lastBeat: hit.beat, lastSwing: swing };
+    const next = placeSingle(context, hands, hand, hit.beat);
+    notes.push(noteFrom(hand, hit.beat, next, makeId));
+    hands[hand] = moveHand(hands[hand], hit.beat, next);
   }
   return notes;
 }

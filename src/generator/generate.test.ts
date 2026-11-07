@@ -3,6 +3,7 @@ import { analyseSong } from "../audio/analysis";
 import { makeClickTrack } from "../audio/testSignals";
 import { DIFFICULTIES, type Difficulty, newProject, type Project } from "../core/model";
 import { validateChart } from "../validation/validate";
+import { measureFlow, swingKind } from "./flowMetrics";
 import { generateChart, type GeneratorInput } from "./generate";
 import { DIFFICULTY_PROFILES } from "./profiles";
 
@@ -52,11 +53,24 @@ describe("generateChart", () => {
     for (let index = 1; index < beats.length; index += 1) expect(beats[index]! - beats[index - 1]!).toBeGreaterThanOrEqual(profile.minGapBeats - 1e-9);
   });
 
-  it.each(DIFFICULTIES)("keeps each hand on its own side in %s", (difficulty) => {
-    for (const note of charts[difficulty].notes) {
-      if (note.color === "red") expect(note.x).toBeLessThanOrEqual(1);
-      else expect(note.x).toBeGreaterThanOrEqual(2);
-    }
+  it.each(DIFFICULTIES)("keeps each hand mostly on its own side in %s", (difficulty) => {
+    const notes = charts[difficulty].notes;
+    const onOwnSide = notes.filter((note) => (note.color === "red" ? note.x <= 1 : note.x >= 2)).length;
+    expect(onOwnSide / notes.length).toBeGreaterThan(0.85);
+  });
+
+  it.each(DIFFICULTIES)("alternates forehand and backhand like a human map in %s", (difficulty) => {
+    expect(measureFlow(charts[difficulty].notes, DURATION).parityFlipRate).toBeGreaterThanOrEqual(0.98);
+  });
+
+  it.each(DIFFICULTIES)("hits downswings low and upswings higher like a human map in %s", (difficulty) => {
+    const flow = measureFlow(charts[difficulty].notes, DURATION);
+    expect(flow.downOnBottomShare).toBeGreaterThan(0.8);
+    expect(flow.upAboveBottomShare).toBeGreaterThan(0.6);
+  });
+
+  it("puts both hands on some strong hits in Normal and above", () => {
+    for (const difficulty of ["Normal", "Hard", "Expert"] as const) expect(measureFlow(charts[difficulty].notes, DURATION).doubleShare).toBeGreaterThan(0.03);
   });
 
   it.each(DIFFICULTIES)("produces %s with no validation errors and no parity, vision or wall problems", (difficulty) => {
@@ -70,8 +84,8 @@ describe("generateChart", () => {
   });
 
   it("flows down and up in Easy instead of only swinging down", () => {
-    const swings = charts.Easy.notes.filter((note) => note.direction !== "any").map((note) => note.direction.startsWith("up") ? "up" : "down");
-    expect(swings.filter((swing) => swing === "up").length).toBeGreaterThan(swings.length / 3);
+    const vertical = charts.Easy.notes.map((note) => swingKind(note.direction)).filter((kind) => kind === "down" || kind === "up");
+    expect(vertical.filter((kind) => kind === "up").length).toBeGreaterThan(vertical.length / 3);
   });
 
   it("leaves the silent section empty", () => {

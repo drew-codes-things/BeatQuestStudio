@@ -105,8 +105,8 @@ export const DEFAULT_PROJECT_NAME = "Untitled map";
 
 export const DEFAULT_SETTINGS: Record<Difficulty, DifficultySettings> = {
   Easy: { noteJumpSpeed: 10, noteJumpOffset: 0 },
-  Normal: { noteJumpSpeed: 10, noteJumpOffset: 0 },
-  Hard: { noteJumpSpeed: 12, noteJumpOffset: 0 },
+  Normal: { noteJumpSpeed: 12, noteJumpOffset: 0 },
+  Hard: { noteJumpSpeed: 14, noteJumpOffset: 0 },
   Expert: { noteJumpSpeed: 16, noteJumpOffset: 0 },
 };
 

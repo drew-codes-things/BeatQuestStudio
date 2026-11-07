@@ -59,8 +59,9 @@ export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPa
       <section className="card">
         <h3>Auto-map</h3>
         <p className="meta">
-          Drafts each difficulty on its own from the song's beats and loudness: Easy is not cut down from Expert. Every note lands on the beat grid
-          from the Song tab, so check the BPM and offset there first. Everything it makes is ordinary notes you can edit or delete.
+          Drafts each difficulty on its own from the song's beats and loudness: Easy is not cut down from Expert. Notes follow how human
+          mappers place them, so swings alternate and flow from one to the next. Every note lands on the beat grid from the Song tab, so
+          check the BPM and offset there first. Everything it makes is ordinary notes you can edit or delete.
         </p>
         {!session && <div className="info-banner">Import a song first.</div>}
         {error && <div className="error-banner" role="alert">{error}</div>}
