@@ -1,4 +1,4 @@
-export type BatchStatus = "waiting" | "working" | "done" | "failed" | "skipped";
+export type BatchStatus = "waiting" | "working" | "done" | "existing" | "failed" | "skipped";
 
 export interface BatchItem<T> {
   id: number;
@@ -6,6 +6,21 @@ export interface BatchItem<T> {
   label: string;
   status: BatchStatus;
   message: string | null;
+  projectId: string | null;
+}
+
+export interface BatchResult {
+  message: string;
+  projectId: string | null;
+  alreadyMade?: boolean;
+}
+
+export type BatchOutcome = string | BatchResult;
+
+interface ItemChange {
+  status: BatchStatus;
+  message: string | null;
+  projectId?: string | null;
 }
 
 export interface BatchEntry<T> {
@@ -23,7 +38,7 @@ export interface BatchSnapshot<T> {
 }
 
 export interface BatchQueueOptions<T> {
-  process: (input: T) => Promise<string>;
+  process: (input: T) => Promise<BatchOutcome>;
   timeoutMs: number;
   restMs: number;
   checkRoom?: (input: T) => Promise<string | null>;
@@ -45,9 +60,21 @@ function rest(milliseconds: number): Promise<void> {
 }
 
 function countStatuses<T>(items: readonly BatchItem<T>[]): Record<BatchStatus, number> {
-  const counts: Record<BatchStatus, number> = { waiting: 0, working: 0, done: 0, failed: 0, skipped: 0 };
+  const counts: Record<BatchStatus, number> = { waiting: 0, working: 0, done: 0, existing: 0, failed: 0, skipped: 0 };
   for (const item of items) counts[item.status] += 1;
   return counts;
+}
+
+export function madeProjectIds<T>(snapshot: BatchSnapshot<T>): string[] {
+  const ids = new Set<string>();
+  for (const item of snapshot.items) {
+    if ((item.status === "done" || item.status === "existing") && item.projectId !== null) ids.add(item.projectId);
+  }
+  return [...ids];
+}
+
+function resultOf(outcome: BatchOutcome): BatchResult {
+  return typeof outcome === "string" ? { message: outcome, projectId: null } : outcome;
 }
 
 export class BatchQueue<T> {
@@ -67,7 +94,7 @@ export class BatchQueue<T> {
   add(entries: readonly BatchEntry<T>[]): void {
     for (const entry of entries) {
       const skipped = entry.rejection !== null;
-      this.items.push({ id: this.nextId++, input: entry.input, label: entry.label, status: skipped ? "skipped" : "waiting", message: entry.rejection });
+      this.items.push({ id: this.nextId++, input: entry.input, label: entry.label, status: skipped ? "skipped" : "waiting", message: entry.rejection, projectId: null });
     }
     this.notify();
   }
@@ -126,15 +153,15 @@ export class BatchQueue<T> {
   private async runItem(item: BatchItem<T>): Promise<void> {
     this.update(item.id, { status: "working", message: null });
     try {
-      const message = await withTimeout(this.options.process(item.input), this.options.timeoutMs);
-      this.update(item.id, { status: "done", message });
+      const result = resultOf(await withTimeout(this.options.process(item.input), this.options.timeoutMs));
+      this.update(item.id, { status: result.alreadyMade ? "existing" : "done", message: result.message, projectId: result.projectId });
     } catch (cause) {
       if (cause instanceof BatchTimeoutError) this.options.onTimeout?.();
       this.update(item.id, { status: "failed", message: cause instanceof Error ? cause.message : String(cause) });
     }
   }
 
-  private update(id: number, change: Pick<BatchItem<T>, "status" | "message">): void {
+  private update(id: number, change: ItemChange): void {
     this.items = this.items.map((item) => (item.id === id ? { ...item, ...change } : item));
     this.notify();
   }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { analyseSong } from "../audio/analysis";
 import { makeClickTrack } from "../audio/testSignals";
 import { DEFAULT_PROJECT_NAME, newProject } from "../core/model";
-import { cleanSongName, readSongTags, songIdentity } from "./songIdentity";
+import { cleanSongName, readSongDurationSeconds, readSongTags, songIdentity } from "./songIdentity";
 import { withImportedSong } from "./songImport";
 
 function riffChunk(id: string, body: Uint8Array): Uint8Array {
@@ -81,6 +81,17 @@ describe("readSongTags", () => {
 
   it("gives empty tags for a file it cannot parse, so the import still goes ahead", async () => {
     expect(await readSongTags(new Blob([new Uint8Array([1, 2, 3])], { type: "audio/mpeg" }))).toEqual({ title: null, artist: null, picture: null });
+  });
+});
+
+describe("readSongDurationSeconds", () => {
+  it("reads the length from the file header", async () => {
+    const seconds = await readSongDurationSeconds(new Blob([taggedWav("Neon Skyline", "Fixture Band")], { type: "audio/wav" }));
+    expect(seconds).toBeCloseTo(0.1, 2);
+  });
+
+  it("gives null for a file it cannot parse", async () => {
+    expect(await readSongDurationSeconds(new Blob([new Uint8Array([1, 2, 3])], { type: "audio/mpeg" }))).toBeNull();
   });
 });
 

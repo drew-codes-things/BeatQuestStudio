@@ -26,6 +26,15 @@ describe("ProjectStore", () => {
     expect((await store.listProjects()).find((summary) => summary.id === "n")?.noteCount).toBe(3);
   });
 
+  it("lists the artist and length of the song so a batch can spot songs already made", async () => {
+    const project = newProject("s", "Song", 1);
+    await store.saveProject({ ...project, song: { title: "Night Drive", subTitle: "", artist: "Test Artist", mapper: "", fileName: "a.mp3", durationSeconds: 201.5, previewStartSeconds: 0, previewDurationSeconds: 10, beatDriftMs: 0 } });
+    await store.saveProject(newProject("n", "No song", 2));
+    const byId = new Map((await store.listProjects()).map((summary) => [summary.id, summary]));
+    expect(byId.get("s")).toMatchObject({ songTitle: "Night Drive", artist: "Test Artist", durationSeconds: 201.5 });
+    expect(byId.get("n")).toMatchObject({ songTitle: null, artist: null, durationSeconds: null });
+  });
+
   it("renames by saving the changed project", async () => {
     const project = newProject("a", "Draft", 1);
     await store.saveProject(project);

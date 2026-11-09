@@ -8,7 +8,7 @@ export const META_VENDOR_ID = 0x2833;
 export const BEAT_SABER_PACKAGE = "com.beatgames.beatsaber";
 export const CUSTOM_LEVELS_PATH = `/sdcard/ModData/${BEAT_SABER_PACKAGE}/Mods/SongCore/CustomLevels`;
 const ADB_INTERFACE = { classCode: 0xff, subclassCode: 0x42, protocolCode: 0x01 };
-const CREDENTIAL_NAME = "Beatmap Studio";
+const CREDENTIAL_NAME = "BeatQuest Studio";
 
 export interface DetectedHeadset {
   name: string;
@@ -65,6 +65,14 @@ export async function listCustomLevels(connection: QuestConnection): Promise<str
     return entries.map((entry) => entry.name).filter((name) => name !== "." && name !== "..").sort();
   } finally {
     await sync.dispose();
+  }
+}
+
+export async function listCustomLevelsIfPresent(connection: QuestConnection): Promise<string[]> {
+  try {
+    return await listCustomLevels(connection);
+  } catch {
+    return [];
   }
 }
 

@@ -2,7 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import { IMPORT_ACCEPT, isSupportedImport } from "../audio/decode";
 import type { BatchMaker } from "../batch/batchMaker";
 import { BATCH_ITEM_TIMEOUT_MS, MAX_IMPORT_BYTES, MAX_SONG_SECONDS } from "../batch/limits";
-import type { BatchItem, BatchSnapshot, BatchStatus } from "../batch/queue";
+import { type BatchItem, type BatchSnapshot, type BatchStatus, madeProjectIds } from "../batch/queue";
 
 const ROWS_SHOWN = 100;
 const MEGABYTE = 1024 * 1024;
@@ -13,11 +13,12 @@ const STATUS_LABELS: Record<BatchStatus, string> = {
   waiting: "Waiting",
   working: "Working",
   done: "Done",
+  existing: "Already made",
   failed: "Failed",
   skipped: "Skipped",
 };
 
-const STATUS_ORDER: Record<BatchStatus, number> = { working: 0, failed: 1, skipped: 2, waiting: 3, done: 4 };
+const STATUS_ORDER: Record<BatchStatus, number> = { working: 0, failed: 1, skipped: 2, waiting: 3, existing: 4, done: 5 };
 
 export function useBatchSnapshot(batch: BatchMaker): BatchSnapshot<File> {
   return useSyncExternalStore((listener) => batch.queue.subscribe(listener), () => batch.queue.snapshot());
@@ -29,16 +30,22 @@ function rowsToShow(items: readonly BatchItem<File>[]): BatchItem<File>[] {
 
 function progressText(snapshot: BatchSnapshot<File>): string {
   const { counts } = snapshot;
-  const finished = counts.done + counts.failed + counts.skipped;
+  const finished = counts.done + counts.existing + counts.failed + counts.skipped;
   const total = finished + counts.waiting + counts.working;
-  return `${finished} of ${total} finished: ${counts.done} made, ${counts.failed} failed, ${counts.skipped} skipped`;
+  return `${finished} of ${total} finished: ${counts.done} made, ${counts.existing} already made, ${counts.failed} failed, ${counts.skipped} skipped`;
 }
 
-export function BatchPanel({ batch }: { batch: BatchMaker }) {
+interface BatchPanelProps {
+  batch: BatchMaker;
+  onSelectMade: (projectIds: string[]) => void;
+}
+
+export function BatchPanel({ batch, onSelectMade }: BatchPanelProps) {
   const snapshot = useBatchSnapshot(batch);
   const { counts } = snapshot;
   const total = snapshot.items.length;
-  const finished = counts.done + counts.failed + counts.skipped;
+  const finished = counts.done + counts.existing + counts.failed + counts.skipped;
+  const madeIds = madeProjectIds(snapshot);
   const [ignored, setIgnored] = useState<number | null>(null);
 
   const addFiles = (list: FileList | null, onlyMedia: boolean) => {
@@ -55,7 +62,8 @@ export function BatchPanel({ batch }: { batch: BatchMaker }) {
       <h3>Batch: a map for every song</h3>
       <p className="meta">
         Add as many songs or videos as you like. They are worked through one at a time so the browser stays responsive, and each becomes its own
-        project with Easy, Normal, Hard and Expert drafted. Limits: {Math.round(MAX_IMPORT_BYTES / MEGABYTE)} MB and {MAX_SONG_SECONDS / SECONDS_PER_MINUTE} minutes per
+        project with Easy, Normal, Hard and Expert drafted. A song you have already made (same title, artist and length) is spotted and left alone.
+        Limits: {Math.round(MAX_IMPORT_BYTES / MEGABYTE)} MB and {MAX_SONG_SECONDS / SECONDS_PER_MINUTE} minutes per
         song, {BATCH_ITEM_TIMEOUT_MS / MS_PER_MINUTE} minutes of work per song, and the batch pauses itself if browser storage runs low.
       </p>
       <div className="toolbar wrap">
@@ -72,6 +80,9 @@ export function BatchPanel({ batch }: { batch: BatchMaker }) {
           ? <button onClick={() => batch.queue.stop()} disabled={snapshot.stopping}>{snapshot.stopping ? "Stopping after this song..." : "Stop after this song"}</button>
           : <button className="primary" onClick={() => batch.start()} disabled={counts.waiting === 0}>Start</button>}
         <button onClick={() => batch.queue.clearFinished()} disabled={finished === 0}>Clear finished</button>
+        <button onClick={() => onSelectMade(madeIds)} disabled={madeIds.length === 0 || snapshot.running} data-testid="select-batch-maps">
+          Select these {madeIds.length} maps for export or the Quest
+        </button>
       </div>
       {ignored !== null && ignored > 0 && <p className="meta">Left out {ignored} files in that folder that are not audio or video.</p>}
       {snapshot.halted && <div className="error-banner" role="alert">{snapshot.halted}</div>}

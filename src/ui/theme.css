@@ -640,6 +640,14 @@ code {
   color: var(--ok);
 }
 
+.batch-list .row-action {
+  margin-left: auto;
+}
+
+.batch-list li.existing .status {
+  color: var(--blue);
+}
+
 .batch-list li.failed .status {
   color: var(--red);
 }

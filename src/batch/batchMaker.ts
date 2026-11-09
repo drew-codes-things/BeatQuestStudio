@@ -1,10 +1,12 @@
 import { AudioWorkerClient } from "../audio/workerProtocol";
 import { DIFFICULTIES, newProject, type Project } from "../core/model";
 import { generateCharts } from "../generator/generate";
+import { readSongDurationSeconds, readSongTags, songIdentity } from "../import/songIdentity";
 import { type ReadSong, readSongFile, storeAutoCover, withImportedSong } from "../import/songImport";
-import type { ProjectStore } from "../storage/projectStore";
+import { type ProjectStore, type ProjectSummary, summarizeProject } from "../storage/projectStore";
+import { findAlreadyMade } from "./alreadyMade";
 import { BATCH_ITEM_TIMEOUT_MS, BATCH_REST_MS, hasStorageRoom, importRejection } from "./limits";
-import { BatchQueue } from "./queue";
+import { type BatchResult, BatchQueue } from "./queue";
 
 const MEGABYTE = 1024 * 1024;
 
@@ -27,6 +29,7 @@ export class BatchMaker {
   private worker: AudioWorkerClient | null = null;
   private generation = 0;
   private persistenceRequested = false;
+  private known: ProjectSummary[] | null = null;
 
   constructor(private readonly store: ProjectStore, private readonly context: () => BaseAudioContext) {
     this.queue = new BatchQueue<File>({
@@ -43,6 +46,7 @@ export class BatchMaker {
   }
 
   start(): void {
+    this.known = null;
     this.requestPersistentStorage();
     void this.queue.start();
   }
@@ -77,7 +81,19 @@ export class BatchMaker {
     return `Browser storage is nearly full (${freeMegabytes} MB free), so the batch paused before "${file.name}". Delete projects you no longer need or free some disk space, then press Start again.`;
   }
 
-  private async makeMap(file: File): Promise<string> {
+  private async knownProjects(): Promise<ProjectSummary[]> {
+    this.known ??= await this.store.listProjects();
+    return this.known;
+  }
+
+  private async findAlreadyMade(file: File): Promise<ProjectSummary | null> {
+    const identity = songIdentity(await readSongTags(file), file.name);
+    return findAlreadyMade(await this.knownProjects(), identity, () => readSongDurationSeconds(file));
+  }
+
+  private async makeMap(file: File): Promise<BatchResult> {
+    const alreadyMade = await this.findAlreadyMade(file);
+    if (alreadyMade) return { message: `already made as "${alreadyMade.name}", so it was left alone`, projectId: alreadyMade.id, alreadyMade: true };
     const startedIn = this.generation;
     const read = await readSongFile(file, this.context(), this.workerClient());
     const { title } = read.identity;
@@ -85,10 +101,12 @@ export class BatchMaker {
     const project = withImportedSong(newProject(crypto.randomUUID(), title, now), { storedFileName: read.audio.fileName, identity: read.identity, analysis: read.analysis }, now);
     const charts = generateCharts(project.timing, read.analysis, DIFFICULTIES, title, () => crypto.randomUUID());
     if (startedIn !== this.generation) throw new Error(`"${file.name}" was abandoned after taking too long`);
-    await this.saveProjectWithAudio({ ...project, charts: { ...project.charts, ...charts } }, read);
+    const made = { ...project, charts: { ...project.charts, ...charts } };
+    await this.saveProjectWithAudio(made, read);
+    (await this.knownProjects()).push(summarizeProject(made));
     const counts = DIFFICULTIES.map((difficulty) => `${difficulty} ${charts[difficulty]?.notes.length ?? 0}`).join(", ");
     const named = read.identity.artist ? `${read.identity.artist} - ${title}` : title;
-    return `${named}, ${Math.round(project.timing.bpm * 100) / 100} BPM${read.strippedFromVideo ? ", sound taken from the video" : ""}: ${counts} notes`;
+    return { message: `${named}, ${Math.round(project.timing.bpm * 100) / 100} BPM${read.strippedFromVideo ? ", sound taken from the video" : ""}: ${counts} notes`, projectId: project.id };
   }
 
   private async saveProjectWithAudio(project: Project, read: ReadSong): Promise<void> {

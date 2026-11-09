@@ -1,6 +1,6 @@
 <div align="center">
 
-# Beatmap Studio
+# BeatQuest Studio
 
 **A Beat Saber map maker that runs in Chrome. Drop in a song or a video, get a beat grid that lands on the music, draft Easy, Normal, Hard and Expert automatically, edit every note, and send the map to a modded Quest.**
 
@@ -18,7 +18,7 @@
 
 ## Overview
 
-Beatmap Studio is a single web page. Everything happens in your browser: songs,
+BeatQuest Studio is a single web page. Everything happens in your browser: songs,
 projects and backups are kept in the browser's own storage on your computer,
 and nothing is uploaded anywhere.
 
@@ -46,10 +46,18 @@ and nothing is uploaded anywhere.
   Every song gets a cover: its own album art, or a generated one, each with a
   small DrewBeat badge. A cover you upload yourself is never replaced.
 - **Batch mode.** Add a pile of songs or a whole folder and every one becomes
-  its own mapped project, worked through one at a time.
+  its own mapped project, worked through one at a time. A song you have
+  already made is spotted by its title, artist and length and left alone, so
+  running the same folder again never makes duplicates.
+- **Batch install on the Quest.** Tick maps (or press one button to pick the
+  whole batch) and install them all over USB. Maps already on the headset are
+  detected and skipped unless you ask to replace them.
 - **Checks, not rules.** Problems such as vision blocks, fast resets or notes
   inside walls are listed as warnings with a Show button; nothing is changed
   without you.
+- **Songs on the Quest.** Read every custom song on the headset: title,
+  artist, mapper, BPM, difficulties and size, with the ones made here marked.
+  Search, sort and remove songs you no longer want.
 - **Export and install.** A zip, a folder written straight into
   `CustomLevels`, or an install over USB to the Quest from the browser.
 
@@ -57,7 +65,7 @@ and nothing is uploaded anywhere.
 
 ## Download
 
-Get `BeatmapStudio-1.0.0.zip` from the [latest release](../../releases/latest).
+Get `BeatQuestStudio-1.2.0.zip` from the [latest release](../../releases/latest).
 It is the built site: unzip it and serve the folder with any static web
 server (see [Hosting](#hosting)). Or run it from source:
 
@@ -82,9 +90,15 @@ server (see [Hosting](#hosting)). Or run it from source:
 ### Batch
 
 On the dashboard, **Add songs** or **Add a folder**. Each file becomes a
-project named after it, with all four difficulties drafted. Tick projects (or
-**Select all with notes**) and use **Export many** to get them in one zip or
-written into `CustomLevels` together.
+project named after it, with all four difficulties drafted.
+
+Before a song is mapped its title, artist and length are compared with the
+projects you already have. If one matches, the song is marked **Already made**
+and left alone instead of being mapped a second time; only new songs are
+mapped. Tick projects (or **Select all with notes**, or **Select these maps**
+after a batch, which covers both the new and the already-made songs) and use
+**Export or install many** to get them in one zip, written into
+`CustomLevels`, or installed on the Quest together.
 
 So a big batch cannot bring the browser down, it works within these limits:
 
@@ -106,7 +120,7 @@ The same file size and length limits apply when importing one song.
 
 The map goes in
 `ModData/com.beatgames.beatsaber/Mods/SongCore/CustomLevels/<map folder>/` on
-the headset. Beat Saber needs SongCore installed for custom levels; Beatmap
+the headset. Beat Saber needs SongCore installed for custom levels; BeatQuest
 Studio does not mod the game itself.
 
 - **Over USB from the browser:** turn on developer mode for the headset in the
@@ -114,10 +128,26 @@ Studio does not mod the game itself.
   tab and accept "Allow USB debugging" inside the headset. Close SideQuest or
   any other adb program first: only one program can talk to the headset at a
   time.
+- **Many at once:** connect once, tick the maps (or use **Select these maps**
+  after a batch) and press **Install on the Quest**. A map is skipped when its
+  folder is already on the headset; tick **Replace maps already on the
+  headset** to install it again, for example after editing it. A map that
+  fails is reported and the rest carry on.
 - **As a folder:** on Linux the plugged-in headset opens as a folder, so
   "Save into a CustomLevels folder" can write to it directly.
 - **By hand:** download the zip, unzip it, and copy the folder into
   `CustomLevels` with any file manager.
+
+### Songs on the Quest
+
+With the headset connected, **Read songs from the Quest** lists every folder in
+`CustomLevels`: the title, artist, mapper, BPM, difficulties and size from each
+map's `Info.dat` (both the older and the newer layout), plus the total space
+used. Folders made by this app are marked **Made in BeatQuest**, folders with no
+readable `Info.dat` are listed with the reason, and the list can be searched and
+sorted by title, artist or size. **Remove** asks for a second click and then
+deletes just that one folder from the headset. Restart Beat Saber or refresh
+songs afterwards to update the list in the game.
 
 ---
 
@@ -177,7 +207,8 @@ it to every supported format and checks each import finds 128 BPM with the
 beat within 5 ms. It then auto-maps, edits with undo and redo, exports, and
 checks the zip and its cover with ffprobe. A tagged MP3 with album art and a
 messily named video check the song names. Last, it runs a batch with a file
-that is too big and one that is not audio. Screenshots go to `smoke-screens/` (or
+that is too big and one that is not audio, then runs it again to check that
+every song is now recognised as already made. Screenshots go to `smoke-screens/` (or
 `SMOKE_SCREENSHOT_DIR`).
 
 | Folder | Responsibility |
@@ -188,8 +219,8 @@ that is too big and one that is not audio. Screenshots go to `smoke-screens/` (o
 | `src/generator` | The auto-mapper: one profile per difficulty and the learned flow table. |
 | `src/validation` | Checks that report problems and never change the map. |
 | `src/export` | `Info.dat`, difficulty files, Ogg Vorbis encoding, covers and zips. |
-| `src/batch` | The batch queue, its limits, batch mapping and batch export. |
-| `src/quest` | WebUSB install over adb and writing into a `CustomLevels` folder. |
+| `src/batch` | The batch queue, its limits, batch mapping, spotting songs already made, and batch export and install. |
+| `src/quest` | WebUSB install over adb, reading and removing the songs on the headset, and writing into a `CustomLevels` folder. |
 | `src/storage` | IndexedDB projects, audio, covers and backups; autosave. |
 | `src/ui` | React screens. |
 

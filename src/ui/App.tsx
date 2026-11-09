@@ -40,7 +40,7 @@ export function App() {
   return (
     <>
       <header className="app-header">
-        <span className="logo"><span className="red">Beatmap</span> <span className="blue">Studio</span></span>
+        <span className="logo"><span className="red">BeatQuest</span> <span className="blue">Studio</span></span>
       </header>
       {storeError && <main className="page"><div className="error-banner" role="alert">{storeError}</div></main>}
       {batch && <WarnWhileBatchRuns batch={batch} />}

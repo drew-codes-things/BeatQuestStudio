@@ -272,6 +272,24 @@ async function batchRows(page) {
   })));
 }
 
+async function runBatchAgain(page) {
+  await clickButton(page, "Clear finished");
+  const input = await page.waitForSelector('[data-testid="batch-files"]');
+  await input.uploadFile(...BATCH_FILES.map((name) => join(FIXTURE_DIR, name)));
+  await page.waitForFunction(() => /^\d+ of \d+ finished: 0 made, 4 already made, 0 failed, 2 skipped/.test(document.querySelector('[data-testid="batch-progress"]')?.textContent ?? ""), { timeout: BATCH_TIMEOUT_MS });
+  const rows = await batchRows(page);
+  const alreadyMade = rows.filter((row) => row.status.includes("existing"));
+  if (alreadyMade.length !== 4) throw new Error(`a second run should find all 4 songs already made, found ${alreadyMade.length}`);
+  console.log(`batch again: ${alreadyMade.map((row) => row.message).join(" | ")}`);
+  await page.click('[data-testid="select-batch-maps"]');
+}
+
+async function expectQuestBarWaitsForHeadset(page) {
+  const installDisabled = await page.$eval('[data-testid="install-many-quest"]', (button) => button.disabled);
+  if (!installDisabled) throw new Error("Install on the Quest must stay disabled until a headset is connected");
+  console.log("quest install bar: install stays disabled until a headset is connected");
+}
+
 async function runBatch(page, shoot) {
   writeBatchExtras();
   await page.goto(PREVIEW_URL);
@@ -283,25 +301,29 @@ async function runBatch(page, shoot) {
   for (const row of rows) console.log(`batch ${row.status} ${row.label}: ${row.message}`);
   const progress = await page.$eval('[data-testid="batch-progress"]', (node) => node.textContent);
   console.log(`batch: ${progress} in ${(Date.now() - started) / 1000}s`);
-  if (!progress.includes("4 made, 0 failed, 2 skipped")) throw new Error(`batch result was "${progress}"`);
+  const counted = /(\d+) made, (\d+) already made, 0 failed, 2 skipped/.exec(progress);
+  if (!counted || Number(counted[1]) + Number(counted[2]) !== 4) throw new Error(`batch result was "${progress}"`);
   const byLabel = Object.fromEntries(rows.map((row) => [row.label, row]));
   if (!byLabel["huge.mp3"].message.includes("256 MB")) throw new Error("the oversize file was not stopped by the size limit");
   if (!byLabel["notes.txt"].message.includes("not an audio or video file")) throw new Error("the text file was not rejected");
   if (!byLabel[BATCH_FILES[3]].message.startsWith("Test Artist - Night Drive,")) throw new Error(`the messy video was not renamed: ${byLabel[BATCH_FILES[3]].message}`);
   await shoot("07-batch");
-  await clickButton(page, "Select all with notes (5)");
-  await expectText(page, "5 selected");
+  await runBatchAgain(page);
+  const mappedCount = await page.$eval('[data-testid="export-bar"]', (bar) => Number(/Select all with notes \((\d+)\)/.exec(bar.textContent)[1]));
+  await clickButton(page, `Select all with notes (${mappedCount})`);
+  await expectText(page, `${mappedCount} selected`);
+  await expectQuestBarWaitsForHeadset(page);
   rmSync(DOWNLOAD_DIR, { recursive: true, force: true });
   mkdirSync(DOWNLOAD_DIR, { recursive: true });
   await page.click('[data-testid="export-many-zip"]');
   await page.waitForSelector('[data-testid="export-many-result"]', { timeout: EXPORT_TIMEOUT_MS });
   const resultText = await page.$eval('[data-testid="export-many-result"]', (node) => node.textContent);
   await shoot("08-export-many");
-  const zipName = await waitForZip("beatmap-studio-maps-");
+  const zipName = await waitForZip("beatquest-studio-maps-");
   await pause(500);
   const files = unzipSync(new Uint8Array(readFileSync(join(DOWNLOAD_DIR, zipName))));
   const folders = [...new Set(Object.keys(files).map((path) => path.split("/")[0]))];
-  if (folders.length !== 5) throw new Error(`expected 5 map folders, found ${folders.join(", ")}`);
+  if (folders.length !== mappedCount) throw new Error(`expected ${mappedCount} map folders, found ${folders.join(", ")}`);
   for (const folder of folders) {
     const info = JSON.parse(new TextDecoder().decode(files[`${folder}/Info.dat`]));
     const songPath = join(DOWNLOAD_DIR, "batch-song.egg");

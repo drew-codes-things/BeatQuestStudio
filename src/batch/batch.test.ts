@@ -6,7 +6,7 @@ import { chartObjectCount, newProject } from "../core/model";
 import { generateCharts } from "../generator/generate";
 import { withImportedSong } from "../import/songImport";
 import { hasStorageRoom, importRejection, MAX_IMPORT_BYTES, MAX_SONG_SECONDS, songLengthRejection } from "./limits";
-import { BatchQueue, type BatchSnapshot } from "./queue";
+import { BatchQueue, type BatchSnapshot, madeProjectIds } from "./queue";
 import { ZipPartWriter } from "./zipParts";
 
 const MEGABYTE = 1024 * 1024;
@@ -179,11 +179,62 @@ describe("BatchQueue", () => {
     const unsubscribe = queue.subscribe(() => { notified += 1; });
     queue.add([{ input: "a", label: "a", rejection: null }, { input: "x", label: "x", rejection: "no" }]);
     await queue.start();
-    expect(queue.snapshot().counts).toEqual({ waiting: 0, working: 0, done: 1, failed: 0, skipped: 1 });
+    expect(queue.snapshot().counts).toEqual({ waiting: 0, working: 0, done: 1, existing: 0, failed: 0, skipped: 1 });
     queue.clearFinished();
     expect(queue.snapshot().items).toEqual([]);
     expect(notified).toBeGreaterThan(2);
     unsubscribe();
+  });
+});
+
+describe("BatchQueue results that name a project", () => {
+  it("marks an already made song, keeps its project and reports it apart from new maps", async () => {
+    const queue = new BatchQueue<string>({
+      process: async (input) => (input === "old"
+        ? { message: "Already made", projectId: "p-old", alreadyMade: true }
+        : { message: "made", projectId: `p-${input}` }),
+      timeoutMs: 1000,
+      restMs: 0,
+    });
+    queue.add(["new1", "old", "new2"].map((input) => ({ input, label: input, rejection: null })));
+    await queue.start();
+    expect(statuses(queue.snapshot())).toEqual(["new1:done", "old:existing", "new2:done"]);
+    expect(queue.snapshot().counts).toMatchObject({ done: 2, existing: 1 });
+    expect(queue.snapshot().items[1]).toMatchObject({ projectId: "p-old", message: "Already made" });
+  });
+
+  it("lists the projects of made and already made songs, but not failed or skipped ones", async () => {
+    const queue = new BatchQueue<string>({
+      process: async (input) => {
+        if (input === "bad") throw new Error("broken");
+        return { message: input, projectId: `p-${input}`, alreadyMade: input === "old" };
+      },
+      timeoutMs: 1000,
+      restMs: 0,
+    });
+    queue.add([
+      { input: "a", label: "a", rejection: null },
+      { input: "old", label: "old", rejection: null },
+      { input: "bad", label: "bad", rejection: null },
+      { input: "x", label: "x", rejection: "not audio" },
+    ]);
+    await queue.start();
+    expect(madeProjectIds(queue.snapshot())).toEqual(["p-a", "p-old"]);
+  });
+
+  it("lists a project once when several files resolve to it", async () => {
+    const queue = new BatchQueue<string>({ process: async () => ({ message: "same", projectId: "p-same", alreadyMade: true }), timeoutMs: 1000, restMs: 0 });
+    queue.add(["a", "b"].map((input) => ({ input, label: input, rejection: null })));
+    await queue.start();
+    expect(madeProjectIds(queue.snapshot())).toEqual(["p-same"]);
+  });
+
+  it("does not count a plain text result as having a project", async () => {
+    const queue = new BatchQueue<string>({ process: async () => "ok", timeoutMs: 1000, restMs: 0 });
+    queue.add([{ input: "a", label: "a", rejection: null }]);
+    await queue.start();
+    expect(queue.snapshot().items[0]!.projectId).toBeNull();
+    expect(madeProjectIds(queue.snapshot())).toEqual([]);
   });
 });
 

@@ -36,11 +36,25 @@ export interface ProjectSummary {
   name: string;
   updatedAt: number;
   songTitle: string | null;
+  artist: string | null;
+  durationSeconds: number | null;
   noteCount: number;
 }
 
 function totalNotes(project: Project): number {
   return DIFFICULTIES.reduce((total, difficulty) => total + project.charts[difficulty].notes.length, 0);
+}
+
+export function summarizeProject(project: Project): ProjectSummary {
+  return {
+    id: project.id,
+    name: project.name,
+    updatedAt: project.updatedAt,
+    songTitle: project.song?.title ?? null,
+    artist: project.song?.artist ?? null,
+    durationSeconds: project.song?.durationSeconds ?? null,
+    noteCount: totalNotes(project),
+  };
 }
 
 function requestToPromise<T>(request: IDBRequest<T>, context: string): Promise<T> {
@@ -85,9 +99,7 @@ export class ProjectStore {
   async listProjects(): Promise<ProjectSummary[]> {
     const store = this.database.transaction(PROJECTS, "readonly").objectStore(PROJECTS);
     const projects = await requestToPromise(store.getAll() as IDBRequest<Project[]>, "listing projects");
-    return projects
-      .map((project) => ({ id: project.id, name: project.name, updatedAt: project.updatedAt, songTitle: project.song?.title ?? null, noteCount: totalNotes(project) }))
-      .sort((left, right) => right.updatedAt - left.updatedAt);
+    return projects.map(summarizeProject).sort((left, right) => right.updatedAt - left.updatedAt);
   }
 
   async loadProject(id: string): Promise<Project | null> {

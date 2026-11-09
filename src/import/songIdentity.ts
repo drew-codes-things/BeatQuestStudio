@@ -79,3 +79,12 @@ export async function readSongTags(file: Blob): Promise<SongTags> {
     return NO_TAGS;
   }
 }
+
+export async function readSongDurationSeconds(file: Blob): Promise<number | null> {
+  try {
+    const { format } = await parseBlob(file, { duration: true, skipCovers: true });
+    return typeof format.duration === "number" && Number.isFinite(format.duration) ? format.duration : null;
+  } catch {
+    return null;
+  }
+}
