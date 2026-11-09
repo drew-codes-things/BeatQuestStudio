@@ -12,7 +12,7 @@
 
 </div>
 
-![The map editor: four difficulty tabs, the lane timeline over the waveform, the cell grid and the 3D preview](screenshot.png)
+![The dashboard: drop songs, see what was made, and install the maps on the Quest in one click](screenshot.png)
 
 ---
 
@@ -76,6 +76,8 @@ server (see [Hosting](#hosting)). Or run it from source:
 ---
 
 ## Making a map
+
+![The map editor: four difficulty tabs, the lane timeline over the waveform, the cell grid and the 3D preview](screenshot-editor.png)
 
 1. **New project**, then on the **Song** tab choose a song or video.
 2. Check the **Beat grid**. "Play with beat clicks" plays the song with a tick
