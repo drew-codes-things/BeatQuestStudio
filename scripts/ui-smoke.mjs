@@ -272,22 +272,81 @@ async function batchRows(page) {
   })));
 }
 
+async function waitForBatchFinished(page, count) {
+  await page.waitForFunction((expected) => {
+    const node = document.querySelector('[data-testid="batch-progress"]');
+    return node !== null && Number(node.dataset.total) === expected && Number(node.dataset.finished) === expected && node.dataset.running === "false";
+  }, { timeout: BATCH_TIMEOUT_MS }, count);
+}
+
+async function batchCounts(page) {
+  return page.$eval('[data-testid="batch-progress"]', (node) => ({
+    made: Number(node.dataset.made), existing: Number(node.dataset.existing), failed: Number(node.dataset.failed), skipped: Number(node.dataset.skipped),
+  }));
+}
+
+async function batchHeadline(page) {
+  return page.$eval('[data-testid="batch-progress"]', (node) => node.textContent.trim());
+}
+
+function distinctProjectsIn(rows) {
+  return new Set(rows.filter((row) => row.status.includes("existing")).map((row) => /"([^"]+)"/.exec(row.message)?.[1])).size;
+}
+
+async function expectAutoSelected(page, itemCount, label) {
+  await page.waitForSelector('[data-testid="send-panel"]', { timeout: 10_000 });
+  const text = await page.$eval('[data-testid="selected-count"]', (node) => node.textContent.trim());
+  const selected = Number(/^(\d+) map/.exec(text)?.[1]);
+  if (!(selected >= 1 && selected <= itemCount)) throw new Error(`${label}: expected the batch's maps to be selected on their own, panel says "${text}"`);
+  console.log(`${label}: ${text} automatically, send panel shown`);
+}
+
 async function runBatchAgain(page) {
   await clickButton(page, "Clear finished");
   const input = await page.waitForSelector('[data-testid="batch-files"]');
   await input.uploadFile(...BATCH_FILES.map((name) => join(FIXTURE_DIR, name)));
-  await page.waitForFunction(() => /^\d+ of \d+ finished: 0 made, 4 already made, 0 failed, 2 skipped/.test(document.querySelector('[data-testid="batch-progress"]')?.textContent ?? ""), { timeout: BATCH_TIMEOUT_MS });
+  await waitForBatchFinished(page, BATCH_FILES.length);
+  const counts = await batchCounts(page);
+  if (counts.made !== 0 || counts.existing !== 4 || counts.failed !== 0 || counts.skipped !== 2) throw new Error(`a second run should find all 4 songs already made, got ${JSON.stringify(counts)}`);
   const rows = await batchRows(page);
-  const alreadyMade = rows.filter((row) => row.status.includes("existing"));
-  if (alreadyMade.length !== 4) throw new Error(`a second run should find all 4 songs already made, found ${alreadyMade.length}`);
-  console.log(`batch again: ${alreadyMade.map((row) => row.message).join(" | ")}`);
-  await page.click('[data-testid="select-batch-maps"]');
+  console.log(`batch again: ${await batchHeadline(page)}`);
+  const text = await page.$eval('[data-testid="selected-count"]', (node) => node.textContent.trim());
+  if (text !== `${distinctProjectsIn(rows)} maps selected`) throw new Error(`the second run should select each project it found once, panel says "${text}"`);
+  console.log(`batch again: ${text} automatically`);
 }
 
-async function expectQuestBarWaitsForHeadset(page) {
-  const installDisabled = await page.$eval('[data-testid="install-many-quest"]', (button) => button.disabled);
-  if (!installDisabled) throw new Error("Install on the Quest must stay disabled until a headset is connected");
-  console.log("quest install bar: install stays disabled until a headset is connected");
+async function runDrop(page) {
+  await clickButton(page, "Clear finished");
+  const base64 = readFileSync(join(FIXTURE_DIR, "song.mp3")).toString("base64");
+  await page.evaluate((encoded) => {
+    const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], "dropped-song.mp3", { type: "audio/mpeg" }));
+    window.dispatchEvent(new DragEvent("drop", { dataTransfer: transfer, bubbles: true, cancelable: true }));
+  }, base64);
+  await waitForBatchFinished(page, 1);
+  const counts = await batchCounts(page);
+  if (counts.failed !== 0 || counts.made + counts.existing !== 1) throw new Error(`a dropped song should be picked up, got ${JSON.stringify(counts)}`);
+  console.log(`drop: ${await batchHeadline(page)}`);
+}
+
+async function runQuestTab(page, shoot) {
+  await clickButton(page, "On the Quest");
+  await page.waitForSelector('[data-testid="quest-songs"]');
+  const label = await page.$eval('[data-testid="read-quest-songs"]', (button) => button.textContent.trim());
+  if (label !== "Connect the Quest and read its songs") throw new Error(`with no headset the viewer should offer to connect first, got "${label}"`);
+  await shoot("09-quest-tab");
+  await clickButton(page, "Make maps");
+  await page.waitForSelector('[data-testid="batch-panel"]');
+  console.log("quest tab: viewer offers to connect first, tabs switch back and forth");
+}
+
+async function expectQuestInstallConnectsFirst(page) {
+  const label = await page.$eval('[data-testid="install-many-quest"]', (button) => ({ text: button.textContent.trim(), disabled: button.disabled }));
+  if (label.text !== "Connect the Quest and install" || label.disabled) throw new Error(`with no headset the install button should offer to connect first, got ${JSON.stringify(label)}`);
+  const status = await page.$eval('[data-testid="quest-status"]', (node) => node.textContent);
+  if (!status.includes("Quest not connected")) throw new Error(`the Quest status should say it is not connected, got "${status}"`);
+  console.log("quest: install offers to connect first, status says not connected");
 }
 
 async function runBatch(page, shoot) {
@@ -296,23 +355,24 @@ async function runBatch(page, shoot) {
   const input = await page.waitForSelector('[data-testid="batch-files"]');
   const started = Date.now();
   await input.uploadFile(...BATCH_FILES.map((name) => join(FIXTURE_DIR, name)));
-  await page.waitForFunction((count) => document.querySelector('[data-testid="batch-progress"]')?.textContent.startsWith(`${count} of ${count} finished`), { timeout: BATCH_TIMEOUT_MS }, BATCH_FILES.length);
+  await waitForBatchFinished(page, BATCH_FILES.length);
   const rows = await batchRows(page);
   for (const row of rows) console.log(`batch ${row.status} ${row.label}: ${row.message}`);
-  const progress = await page.$eval('[data-testid="batch-progress"]', (node) => node.textContent);
-  console.log(`batch: ${progress} in ${(Date.now() - started) / 1000}s`);
-  const counted = /(\d+) made, (\d+) already made, 0 failed, 2 skipped/.exec(progress);
-  if (!counted || Number(counted[1]) + Number(counted[2]) !== 4) throw new Error(`batch result was "${progress}"`);
+  const counted = await batchCounts(page);
+  console.log(`batch: ${await batchHeadline(page)} in ${(Date.now() - started) / 1000}s`);
+  if (counted.made + counted.existing !== 4 || counted.failed !== 0 || counted.skipped !== 2) throw new Error(`batch result was ${JSON.stringify(counted)}`);
+  await expectAutoSelected(page, rows.filter((row) => row.status.includes("done") || row.status.includes("existing")).length, "first batch");
   const byLabel = Object.fromEntries(rows.map((row) => [row.label, row]));
   if (!byLabel["huge.mp3"].message.includes("256 MB")) throw new Error("the oversize file was not stopped by the size limit");
   if (!byLabel["notes.txt"].message.includes("not an audio or video file")) throw new Error("the text file was not rejected");
   if (!byLabel[BATCH_FILES[3]].message.startsWith("Test Artist - Night Drive,")) throw new Error(`the messy video was not renamed: ${byLabel[BATCH_FILES[3]].message}`);
   await shoot("07-batch");
   await runBatchAgain(page);
-  const mappedCount = await page.$eval('[data-testid="export-bar"]', (bar) => Number(/Select all with notes \((\d+)\)/.exec(bar.textContent)[1]));
+  await runDrop(page);
+  const mappedCount = await page.$eval('[data-testid="project-list-bar"]', (bar) => Number(/Select all with notes \((\d+)\)/.exec(bar.textContent)[1]));
   await clickButton(page, `Select all with notes (${mappedCount})`);
-  await expectText(page, `${mappedCount} selected`);
-  await expectQuestBarWaitsForHeadset(page);
+  await expectText(page, `${mappedCount} maps selected`);
+  await expectQuestInstallConnectsFirst(page);
   rmSync(DOWNLOAD_DIR, { recursive: true, force: true });
   mkdirSync(DOWNLOAD_DIR, { recursive: true });
   await page.click('[data-testid="export-many-zip"]');
@@ -356,6 +416,7 @@ async function main() {
     await runEditorFlow(page, shoot);
     await runExport(page, shoot, browser);
     await runBatch(page, shoot);
+    await runQuestTab(page, shoot);
     if (pageErrors.length > 0) throw new Error(`page reported errors:\n${pageErrors.join("\n")}`);
     console.log("ui smoke passed");
   } finally {

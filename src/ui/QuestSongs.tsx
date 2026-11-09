@@ -62,13 +62,14 @@ export function QuestSongs({ headset, projects }: { headset: Headset; projects: 
   const madeHere = (songs ?? []).filter((song) => matchStudioProject(song.folder, projects)).length;
 
   const read = async () => {
-    if (!headset.connection) return;
+    const connection = headset.connection ?? await headset.connect();
+    if (!connection) return;
     stopRequested.current = false;
     setError(null);
     setNote(null);
     setProgress({ done: 0, total: 0 });
     try {
-      setSongs(await readInstalledSongs(headset.connection, { onProgress: setProgress, shouldStop: () => stopRequested.current }));
+      setSongs(await readInstalledSongs(connection, { onProgress: setProgress, shouldStop: () => stopRequested.current }));
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -100,11 +101,11 @@ export function QuestSongs({ headset, projects }: { headset: Headset; projects: 
     <section className="card" data-testid="quest-songs">
       <h3>Songs on the Quest</h3>
       <p className="meta">
-        See every custom song on the headset with its mapper, difficulties and size, and remove the ones you no longer want. Connect the Quest in the box above first.
+        See every custom song on the headset with its mapper, difficulties and size, and remove the ones you no longer want.
       </p>
       <div className="toolbar wrap">
-        <button className="primary" disabled={!headset.connection || reading || removing} onClick={() => void read()} data-testid="read-quest-songs">
-          {songs ? "Read the Quest again" : "Read songs from the Quest"}
+        <button className="primary" disabled={!headset.usbAvailable || headset.connecting || reading || removing} onClick={() => void read()} data-testid="read-quest-songs">
+          {songs ? "Read the Quest again" : headset.connection ? "Read songs from the Quest" : "Connect the Quest and read its songs"}
         </button>
         {reading && <button onClick={() => { stopRequested.current = true; }}>Stop</button>}
         {songs && (
@@ -118,7 +119,8 @@ export function QuestSongs({ headset, projects }: { headset: Headset; projects: 
           </>
         )}
       </div>
-      {!headset.connection && <p className="meta">The Quest is not connected.</p>}
+      {!headset.usbAvailable && <p className="meta">Reading the Quest needs WebUSB, so use Chrome or Edge on a computer.</p>}
+      {headset.error && <div className="error-banner" role="alert">{headset.error}</div>}
       {reading && <div className="info-banner" role="status">Reading {progress.done} of {progress.total || "?"} songs<progress className="batch-progress" max={progress.total || 1} value={progress.done} /></div>}
       {error && <div className="error-banner" role="alert">{error}</div>}
       {note && <p className="meta ok" role="status">{note}</p>}

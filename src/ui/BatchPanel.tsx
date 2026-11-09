@@ -1,8 +1,11 @@
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { IMPORT_ACCEPT, isSupportedImport } from "../audio/decode";
 import type { BatchMaker } from "../batch/batchMaker";
 import { BATCH_ITEM_TIMEOUT_MS, MAX_IMPORT_BYTES, MAX_SONG_SECONDS } from "../batch/limits";
-import { type BatchItem, type BatchSnapshot, type BatchStatus, madeProjectIds } from "../batch/queue";
+import type { BatchItem, BatchSnapshot, BatchStatus } from "../batch/queue";
+import { batchHeadline } from "./batchSummary";
+import { collectDroppedFiles, type DroppedItem, type EntryLike } from "./dropped";
+import { errorMessage } from "./format";
 
 const ROWS_SHOWN = 100;
 const MEGABYTE = 1024 * 1024;
@@ -28,28 +31,28 @@ function rowsToShow(items: readonly BatchItem<File>[]): BatchItem<File>[] {
   return [...items].sort((left, right) => STATUS_ORDER[left.status] - STATUS_ORDER[right.status] || left.id - right.id).slice(0, ROWS_SHOWN);
 }
 
-function progressText(snapshot: BatchSnapshot<File>): string {
-  const { counts } = snapshot;
-  const finished = counts.done + counts.existing + counts.failed + counts.skipped;
-  const total = finished + counts.waiting + counts.working;
-  return `${finished} of ${total} finished: ${counts.done} made, ${counts.existing} already made, ${counts.failed} failed, ${counts.skipped} skipped`;
+function carriesFiles(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
-interface BatchPanelProps {
-  batch: BatchMaker;
-  onSelectMade: (projectIds: string[]) => void;
+function droppedItems(transfer: DataTransfer): DroppedItem[] {
+  return Array.from(transfer.items, (item) => ({
+    entry: (item.webkitGetAsEntry?.() as unknown as EntryLike | null | undefined) ?? null,
+    file: item.kind === "file" ? item.getAsFile() : null,
+  }));
 }
 
-export function BatchPanel({ batch, onSelectMade }: BatchPanelProps) {
+export function BatchPanel({ batch }: { batch: BatchMaker }) {
   const snapshot = useBatchSnapshot(batch);
   const { counts } = snapshot;
   const total = snapshot.items.length;
   const finished = counts.done + counts.existing + counts.failed + counts.skipped;
-  const madeIds = madeProjectIds(snapshot);
+  const needsAttention = counts.failed + counts.skipped;
   const [ignored, setIgnored] = useState<number | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
-  const addFiles = (list: FileList | null, onlyMedia: boolean) => {
-    const files = Array.from(list ?? []);
+  const addFiles = (files: File[], onlyMedia: boolean) => {
     const chosen = onlyMedia ? files.filter((file) => isSupportedImport(file.name, file.type)) : files;
     setIgnored(onlyMedia ? files.length - chosen.length : null);
     if (chosen.length === 0) return;
@@ -57,51 +60,88 @@ export function BatchPanel({ batch, onSelectMade }: BatchPanelProps) {
     batch.start();
   };
 
+  useEffect(() => {
+    const onDragOver = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      setDragging(true);
+    };
+    const onDragLeave = (event: DragEvent) => {
+      if (event.relatedTarget === null) setDragging(false);
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!carriesFiles(event) || !event.dataTransfer) return;
+      event.preventDefault();
+      setDragging(false);
+      setDropError(null);
+      const items = droppedItems(event.dataTransfer);
+      collectDroppedFiles(items).then((files) => addFiles(files, true)).catch((cause: unknown) => setDropError(errorMessage(cause)));
+    };
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [batch]);
+
   return (
-    <section className="card batch" data-testid="batch-panel">
-      <h3>Batch: a map for every song</h3>
-      <p className="meta">
-        Add as many songs or videos as you like. They are worked through one at a time so the browser stays responsive, and each becomes its own
-        project with Easy, Normal, Hard and Expert drafted. A song you have already made (same title, artist and length) is spotted and left alone.
-        Limits: {Math.round(MAX_IMPORT_BYTES / MEGABYTE)} MB and {MAX_SONG_SECONDS / SECONDS_PER_MINUTE} minutes per
-        song, {BATCH_ITEM_TIMEOUT_MS / MS_PER_MINUTE} minutes of work per song, and the batch pauses itself if browser storage runs low.
-      </p>
-      <div className="toolbar wrap">
-        <label className="file-button">
-          Add songs
-          <input type="file" multiple accept={IMPORT_ACCEPT} data-testid="batch-files" onChange={(event) => { addFiles(event.target.files, false); event.target.value = ""; }} />
-        </label>
-        <label className="file-button">
-          Add a folder
-          <input type="file" multiple ref={(node) => node?.setAttribute("webkitdirectory", "")} data-testid="batch-folder"
-            onChange={(event) => { addFiles(event.target.files, true); event.target.value = ""; }} />
-        </label>
-        {snapshot.running
-          ? <button onClick={() => batch.queue.stop()} disabled={snapshot.stopping}>{snapshot.stopping ? "Stopping after this song..." : "Stop after this song"}</button>
-          : <button className="primary" onClick={() => batch.start()} disabled={counts.waiting === 0}>Start</button>}
-        <button onClick={() => batch.queue.clearFinished()} disabled={finished === 0}>Clear finished</button>
-        <button onClick={() => onSelectMade(madeIds)} disabled={madeIds.length === 0 || snapshot.running} data-testid="select-batch-maps">
-          Select these {madeIds.length} maps for export or the Quest
-        </button>
+    <section className={dragging ? "card batch dragging" : "card batch"} data-testid="batch-panel">
+      <h3>Make maps from your songs</h3>
+      <div className="dropzone">
+        <p className="dropzone-title">{dragging ? "Let go to add them" : "Drop songs or a whole folder anywhere on this page"}</p>
+        <p className="meta">MP3, WAV, OGG, FLAC, M4A or video. Each song gets Easy, Normal, Hard and Expert, and songs you already made are skipped.</p>
+        <div className="toolbar wrap center">
+          <label className="file-button">
+            Add songs
+            <input type="file" multiple accept={IMPORT_ACCEPT} data-testid="batch-files" onChange={(event) => { addFiles(Array.from(event.target.files ?? []), false); event.target.value = ""; }} />
+          </label>
+          <label className="file-button">
+            Add a folder
+            <input type="file" multiple ref={(node) => node?.setAttribute("webkitdirectory", "")} data-testid="batch-folder"
+              onChange={(event) => { addFiles(Array.from(event.target.files ?? []), true); event.target.value = ""; }} />
+          </label>
+        </div>
       </div>
+      {dropError && <div className="error-banner" role="alert">{dropError}</div>}
       {ignored !== null && ignored > 0 && <p className="meta">Left out {ignored} files in that folder that are not audio or video.</p>}
       {snapshot.halted && <div className="error-banner" role="alert">{snapshot.halted}</div>}
       {total > 0 && (
         <>
           <progress className="batch-progress" max={total} value={finished} />
-          <p className="meta" data-testid="batch-progress">{progressText(snapshot)}{snapshot.running ? "" : counts.waiting > 0 ? ". Paused." : "."}</p>
-          <ul className="batch-list">
-            {rowsToShow(snapshot.items).map((item) => (
-              <li key={item.id} className={item.status} data-testid="batch-row">
-                <span className="status">{STATUS_LABELS[item.status]}</span>
-                <span className="label">{item.label}</span>
-                {item.message && <span className="message">{item.message}</span>}
-              </li>
-            ))}
-          </ul>
-          {total > ROWS_SHOWN && <p className="meta">Showing {ROWS_SHOWN} of {total}: anything still working or with a problem comes first.</p>}
+          <p className="headline" data-testid="batch-progress" data-total={total} data-finished={finished} data-made={counts.done} data-existing={counts.existing}
+            data-failed={counts.failed} data-skipped={counts.skipped} data-running={snapshot.running ? "true" : "false"}>
+            {batchHeadline(counts, snapshot.running)}
+          </p>
+          <div className="toolbar wrap">
+            {snapshot.running && <button onClick={() => batch.queue.stop()} disabled={snapshot.stopping}>{snapshot.stopping ? "Stopping after this song..." : "Stop after this song"}</button>}
+            {!snapshot.running && counts.waiting > 0 && <button className="primary" onClick={() => batch.start()}>Start</button>}
+            <button onClick={() => batch.queue.clearFinished()} disabled={finished === 0}>Clear finished</button>
+          </div>
+          <details className="rows" open={needsAttention > 0}>
+            <summary>{needsAttention > 0 ? `Song by song (${needsAttention} need a look)` : "Song by song"}</summary>
+            <ul className="batch-list">
+              {rowsToShow(snapshot.items).map((item) => (
+                <li key={item.id} className={item.status} data-testid="batch-row">
+                  <span className="status">{STATUS_LABELS[item.status]}</span>
+                  <span className="label">{item.label}</span>
+                  {item.message && <span className="message">{item.message}</span>}
+                </li>
+              ))}
+            </ul>
+            {total > ROWS_SHOWN && <p className="meta">Showing {ROWS_SHOWN} of {total}: anything still working or with a problem comes first.</p>}
+          </details>
         </>
       )}
+      <details className="limits">
+        <summary>Limits</summary>
+        <p className="meta">
+          Songs are worked through one at a time so the browser stays responsive. {Math.round(MAX_IMPORT_BYTES / MEGABYTE)} MB and {MAX_SONG_SECONDS / SECONDS_PER_MINUTE} minutes per song,
+          {" "}{BATCH_ITEM_TIMEOUT_MS / MS_PER_MINUTE} minutes of work per song, and the batch pauses itself if browser storage runs low.
+        </p>
+      </details>
     </section>
   );
 }

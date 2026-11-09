@@ -8,7 +8,7 @@ export interface Headset {
   connecting: boolean;
   error: string | null;
   usbAvailable: boolean;
-  connect: () => Promise<void>;
+  connect: () => Promise<QuestConnection | null>;
   disconnect: () => Promise<void>;
 }
 
@@ -26,8 +26,10 @@ export function useHeadset(): Headset {
       const installed = await beatSaberInstalled(connected);
       setConnection(connected);
       setNote(installed ? `Connected to ${connected.name}. Beat Saber is installed.` : `Connected to ${connected.name}, but Beat Saber was not found on it.`);
+      return connected;
     } catch (cause) {
       setError(errorMessage(cause));
+      return null;
     } finally {
       setConnecting(false);
     }

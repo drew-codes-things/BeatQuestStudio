@@ -93,7 +93,7 @@ export class BatchMaker {
 
   private async makeMap(file: File): Promise<BatchResult> {
     const alreadyMade = await this.findAlreadyMade(file);
-    if (alreadyMade) return { message: `already made as "${alreadyMade.name}", so it was left alone`, projectId: alreadyMade.id, alreadyMade: true };
+    if (alreadyMade) return { message: `Matches your project "${alreadyMade.name}", so it was left alone`, projectId: alreadyMade.id, alreadyMade: true };
     const startedIn = this.generation;
     const read = await readSongFile(file, this.context(), this.workerClient());
     const { title } = read.identity;

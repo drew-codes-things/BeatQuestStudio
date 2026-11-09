@@ -45,13 +45,14 @@ and nothing is uploaded anywhere.
   `03_Artist_-_Song_(Official_Video)_[HD].mp4` becomes "Song" by "Artist".
   Every song gets a cover: its own album art, or a generated one, each with a
   small DrewBeat badge. A cover you upload yourself is never replaced.
-- **Batch mode.** Add a pile of songs or a whole folder and every one becomes
-  its own mapped project, worked through one at a time. A song you have
-  already made is spotted by its title, artist and length and left alone, so
-  running the same folder again never makes duplicates.
-- **Batch install on the Quest.** Tick maps (or press one button to pick the
-  whole batch) and install them all over USB. Maps already on the headset are
-  detected and skipped unless you ask to replace them.
+- **Batch mode.** Drop a pile of songs or a whole folder anywhere on the page
+  and every one becomes its own mapped project, worked through one at a time.
+  A song you have already made is spotted by its title, artist and length and
+  left alone, so running the same folder again never makes duplicates.
+- **Batch install on the Quest.** When a batch finishes its maps are already
+  selected, and one button connects the Quest and installs them all over USB.
+  Maps already on the headset are detected and skipped unless you ask to
+  replace them.
 - **Checks, not rules.** Problems such as vision blocks, fast resets or notes
   inside walls are listed as warnings with a Show button; nothing is changed
   without you.
@@ -89,16 +90,21 @@ server (see [Hosting](#hosting)). Or run it from source:
 
 ### Batch
 
-On the dashboard, **Add songs** or **Add a folder**. Each file becomes a
-project named after it, with all four difficulties drafted.
+On the **Make maps** tab, drop songs or a whole folder anywhere on the page, or
+use **Add songs** or **Add a folder**. Each file becomes a project named after
+it, with all four difficulties drafted. The batch starts by itself, and the
+**Song by song** list opens on its own when something needs a look.
 
 Before a song is mapped its title, artist and length are compared with the
 projects you already have. If one matches, the song is marked **Already made**
 and left alone instead of being mapped a second time; only new songs are
-mapped. Tick projects (or **Select all with notes**, or **Select these maps**
-after a batch, which covers both the new and the already-made songs) and use
-**Export or install many** to get them in one zip, written into
-`CustomLevels`, or installed on the Quest together.
+mapped.
+
+When the batch finishes, every map it made or found is selected and a panel
+offers **Connect the Quest and install** or **Download .zip**. **More options**
+has saving into a `CustomLevels` folder and replacing maps already on the
+headset. You can also tick any projects in the list, or use **Select all with
+notes**, and send those instead.
 
 So a big batch cannot bring the browser down, it works within these limits:
 
@@ -128,11 +134,12 @@ Studio does not mod the game itself.
   tab and accept "Allow USB debugging" inside the headset. Close SideQuest or
   any other adb program first: only one program can talk to the headset at a
   time.
-- **Many at once:** connect once, tick the maps (or use **Select these maps**
-  after a batch) and press **Install on the Quest**. A map is skipped when its
-  folder is already on the headset; tick **Replace maps already on the
-  headset** to install it again, for example after editing it. A map that
-  fails is reported and the rest carry on.
+- **Many at once:** select the maps (a finished batch does this for you) and
+  press **Connect the Quest and install**, or **Install N on the Quest** when
+  it is already connected. A map is skipped when its folder is already on the
+  headset; under **More options** tick **Replace maps already on the headset**
+  to install it again, for example after editing it. A map that fails is
+  reported and the rest carry on.
 - **As a folder:** on Linux the plugged-in headset opens as a folder, so
   "Save into a CustomLevels folder" can write to it directly.
 - **By hand:** download the zip, unzip it, and copy the folder into
@@ -140,7 +147,8 @@ Studio does not mod the game itself.
 
 ### Songs on the Quest
 
-With the headset connected, **Read songs from the Quest** lists every folder in
+Open the **On the Quest** tab and press **Connect the Quest and read its songs**.
+It lists every folder in
 `CustomLevels`: the title, artist, mapper, BPM, difficulties and size from each
 map's `Info.dat` (both the older and the newer layout), plus the total space
 used. Folders made by this app are marked **Made in BeatQuest**, folders with no
@@ -207,8 +215,10 @@ it to every supported format and checks each import finds 128 BPM with the
 beat within 5 ms. It then auto-maps, edits with undo and redo, exports, and
 checks the zip and its cover with ffprobe. A tagged MP3 with album art and a
 messily named video check the song names. Last, it runs a batch with a file
-that is too big and one that is not audio, then runs it again to check that
-every song is now recognised as already made. Screenshots go to `smoke-screens/` (or
+that is too big and one that is not audio, checks the finished batch selected
+its own maps, then runs it again to check that every song is now recognised as
+already made. A file dropped onto the page and the Quest tab are checked too.
+Screenshots go to `smoke-screens/` (or
 `SMOKE_SCREENSHOT_DIR`).
 
 | Folder | Responsibility |
