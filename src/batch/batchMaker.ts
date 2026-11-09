@@ -1,6 +1,6 @@
 import { AudioWorkerClient } from "../audio/workerProtocol";
 import { DIFFICULTIES, newProject, type Project } from "../core/model";
-import { generateCharts } from "../generator/generate";
+import { FIXED_MAP_SEED, generateCharts } from "../generator/generate";
 import { readSongDurationSeconds, readSongTags, songIdentity } from "../import/songIdentity";
 import { type ReadSong, readSongFile, storeAutoCover, withImportedSong } from "../import/songImport";
 import { type ProjectStore, type ProjectSummary, summarizeProject } from "../storage/projectStore";
@@ -99,7 +99,7 @@ export class BatchMaker {
     const { title } = read.identity;
     const now = Date.now();
     const project = withImportedSong(newProject(crypto.randomUUID(), title, now), { storedFileName: read.audio.fileName, identity: read.identity, analysis: read.analysis }, now);
-    const charts = generateCharts(project.timing, read.analysis, DIFFICULTIES, title, () => crypto.randomUUID());
+    const charts = generateCharts(project.timing, read.analysis, DIFFICULTIES, FIXED_MAP_SEED, () => crypto.randomUUID());
     if (startedIn !== this.generation) throw new Error(`"${file.name}" was abandoned after taking too long`);
     const made = { ...project, charts: { ...project.charts, ...charts } };
     await this.saveProjectWithAudio(made, read);

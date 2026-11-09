@@ -81,7 +81,8 @@ server (see [Hosting](#hosting)). Or run it from source:
 2. Check the **Beat grid**. "Play with beat clicks" plays the song with a tick
    on every beat; nudge the offset or use BPM x2 and /2 if it is off.
 3. **Auto-map** drafts the difficulties you tick. A backup is taken first, so
-   it can always be undone from the dashboard.
+   it can always be undone from the dashboard. There is nothing to tune: the
+   same song always gets the same draft, so pressing it again changes nothing.
 4. Edit on the **Map** tab. Click a cell in the grid to place a note at the
    cursor, and drag to set its direction. Every shortcut is listed under the
    editor.
@@ -191,14 +192,14 @@ curated and ranked maps (medians, human / auto):
 
 | | Easy | Normal | Hard | Expert |
 |---|---|---|---|---|
-| Notes per second | 1.67 / 1.70 | 2.27 / 2.38 | 3.22 / 3.30 | 3.96 / 4.24 |
+| Notes per second | 1.67 / 1.68 | 2.27 / 2.41 | 3.22 / 3.28 | 3.96 / 4.30 |
 | Forehand/backhand alternation | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
-| Downswings on the bottom row | 0.99 / 1.00 | 0.99 / 0.99 | 0.94 / 0.96 | 0.91 / 0.90 |
-| Upswings above the bottom row | 0.82 / 0.78 | 0.86 / 0.82 | 0.89 / 0.88 | 0.92 / 0.89 |
-| Two-handed hits | 0.07 / 0.10 | 0.11 / 0.13 | 0.12 / 0.14 | 0.15 / 0.19 |
+| Downswings on the bottom row | 0.99 / 0.99 | 0.99 / 0.99 | 0.94 / 0.95 | 0.91 / 0.91 |
+| Upswings above the bottom row | 0.82 / 0.81 | 0.86 / 0.84 | 0.89 / 0.85 | 0.92 / 0.90 |
+| Two-handed hits | 0.07 / 0.08 | 0.11 / 0.15 | 0.12 / 0.12 | 0.15 / 0.19 |
 
 On 11 maps held back from learning, alternation stays at 1.00 for every
-difficulty and Hard and Expert density lands within 2% of the human map.
+difficulty and Hard and Expert density lands within 3% of the human map.
 `scripts/learn-flow.ts` rebuilds `src/generator/flowTable.json` from a folder
 of maps; only counts of moves are kept, never the maps themselves.
 

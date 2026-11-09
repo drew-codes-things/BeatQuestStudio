@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { type Chart, chartObjectCount, DIFFICULTIES, type Difficulty, type Project } from "../core/model";
-import { generateCharts } from "../generator/generate";
+import { FIXED_MAP_SEED, generateCharts } from "../generator/generate";
 import type { ProjectStore } from "../storage/projectStore";
 import { errorMessage } from "./format";
 import type { SongSession } from "./session";
@@ -12,13 +12,8 @@ interface AutoMapPanelProps {
   onGenerated: (charts: Partial<Record<Difficulty, Chart>>) => void;
 }
 
-function randomSeed(): string {
-  return Math.random().toString(36).slice(2, 8);
-}
-
 export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPanelProps) {
   const [chosen, setChosen] = useState<Set<Difficulty>>(new Set(DIFFICULTIES));
-  const [seed, setSeed] = useState(randomSeed);
   const [confirming, setConfirming] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,10 +30,10 @@ export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPa
     setError(null);
     try {
       await store.createBackup(project, "before auto-map", Date.now());
-      const charts = generateCharts(project.timing, session.analysis, DIFFICULTIES.filter((difficulty) => chosen.has(difficulty)), seed, () => crypto.randomUUID());
+      const charts = generateCharts(project.timing, session.analysis, DIFFICULTIES.filter((difficulty) => chosen.has(difficulty)), FIXED_MAP_SEED, () => crypto.randomUUID());
       onGenerated(charts);
       const summary = Object.entries(charts).map(([difficulty, chart]) => `${difficulty} ${chart.notes.length}`).join(", ");
-      setStatus(`Drafted ${summary} notes from seed "${seed}". A backup of the previous version was saved.`);
+      setStatus(`Drafted ${summary} notes. A backup of the previous version was saved.`);
     } catch (cause) {
       setError(errorMessage(cause));
     }
@@ -74,8 +69,6 @@ export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPa
           ))}
         </div>
         <div className="toolbar">
-          <label className="field inline"><span>Seed</span><input type="text" value={seed} onChange={(event) => { setSeed(event.target.value); setConfirming(false); }} /></label>
-          <button onClick={() => { setSeed(randomSeed()); setConfirming(false); }}>New seed</button>
           <button className={confirming ? "danger armed" : "primary"} disabled={!session || chosen.size === 0} onClick={() => void generate()} data-testid="generate">
             {confirming ? `Replace ${willReplace.join(", ")}? Click again` : "Generate"}
           </button>

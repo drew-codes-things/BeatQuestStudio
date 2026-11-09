@@ -55,6 +55,8 @@ const CROSSOVER_WINDOW_BEATS = 1;
 const TRANSITION_FLOOR = 0.02;
 const OUTER_COLUMNS: Record<Hand, number> = { red: 0, blue: 3 };
 
+export const FIXED_MAP_SEED = "s16";
+
 export function generateChart(input: GeneratorInput, difficulty: Difficulty, seed: string, makeId: IdFactory): Chart {
   const profile = DIFFICULTY_PROFILES[difficulty];
   const random = seededRandom(hashSeed(`${seed}:${difficulty}`));

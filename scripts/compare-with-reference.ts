@@ -5,13 +5,13 @@ import { analyseSong, type Onset } from "../src/audio/analysis";
 import { DIFFICULTIES, type Difficulty, type Note, type Timing } from "../src/core/model";
 import { beatToSeconds } from "../src/core/timing";
 import { measureFlow, type FlowMetrics } from "../src/generator/flowMetrics";
-import { generateCharts } from "../src/generator/generate";
+import { FIXED_MAP_SEED, generateCharts } from "../src/generator/generate";
 import { readReferenceMaps, type ReferenceMap } from "./referenceMaps";
 
 const SAMPLE_RATE = 44100;
 const MATCH_WINDOW_SECONDS = 0.05;
 const DECODE_BUFFER_BYTES = 512 * 1024 * 1024;
-const COMPARE_SEED = "compare";
+const COMPARE_SEED = process.env.COMPARE_SEED ?? FIXED_MAP_SEED;
 
 interface DifficultyComparison {
   difficulty: Difficulty;

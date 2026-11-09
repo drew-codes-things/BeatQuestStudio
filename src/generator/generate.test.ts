@@ -4,7 +4,7 @@ import { makeClickTrack } from "../audio/testSignals";
 import { DIFFICULTIES, type Difficulty, newProject, type Project } from "../core/model";
 import { validateChart } from "../validation/validate";
 import { measureFlow, swingKind } from "./flowMetrics";
-import { generateChart, type GeneratorInput } from "./generate";
+import { FIXED_MAP_SEED, generateChart, type GeneratorInput } from "./generate";
 import { DIFFICULTY_PROFILES } from "./profiles";
 
 const SAMPLE_RATE = 22050;
@@ -107,6 +107,17 @@ describe("generateChart", () => {
     const other = generateChart(input, "Hard", "other", counter());
     expect(again).toEqual(charts.Hard);
     expect(other.notes.map((note) => [note.beat, note.x, note.y, note.direction])).not.toEqual(charts.Hard.notes.map((note) => [note.beat, note.x, note.y, note.direction]));
+  });
+
+  it("has one fixed seed, so the same song always gets the same map whatever the note ids are", () => {
+    const placement = (chart: ReturnType<typeof generateChart>) => chart.notes.map((note) => [note.beat, note.x, note.y, note.color, note.direction]);
+    let next = 0;
+    const first = generateChart(input, "Expert", FIXED_MAP_SEED, counter());
+    const second = generateChart(input, "Expert", FIXED_MAP_SEED, () => `other-${next++}`);
+    expect(typeof FIXED_MAP_SEED).toBe("string");
+    expect(FIXED_MAP_SEED.length).toBeGreaterThan(0);
+    expect(first.notes.length).toBeGreaterThan(0);
+    expect(placement(second)).toEqual(placement(first));
   });
 
   it("follows a triplet rhythm in Hard and Expert instead of forcing it onto sixteenths", () => {
