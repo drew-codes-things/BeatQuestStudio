@@ -4,7 +4,7 @@ import { makeClickTrack } from "../audio/testSignals";
 import { DIFFICULTIES, type Difficulty, newProject, type Project } from "../core/model";
 import { validateChart } from "../validation/validate";
 import { measureFlow, swingKind } from "./flowMetrics";
-import { FIXED_MAP_SEED, generateChart, type GeneratorInput } from "./generate";
+import { barIntensities, FIXED_MAP_SEED, generateChart, type GeneratorInput } from "./generate";
 import { DIFFICULTY_PROFILES } from "./profiles";
 
 const SAMPLE_RATE = 22050;
@@ -37,6 +37,35 @@ function projectWith(difficulty: Difficulty): Project {
   project.charts[difficulty] = charts[difficulty];
   return project;
 }
+
+function verseThenChorus(): GeneratorInput {
+  const song = makeClickTrack({ bpm: BPM * 4, offsetSeconds: OFFSET, durationSeconds: 60, sampleRate: SAMPLE_RATE, accentEvery: 4, noiseLevel: 0.02 });
+  const chorusStart = Math.round(30 * SAMPLE_RATE);
+  for (let index = 0; index < chorusStart; index += 1) song[index] = song[index]! * 0.75;
+  const analysis = analyseSong([song], SAMPLE_RATE);
+  return { timing: { bpm: BPM, offsetSeconds: OFFSET }, durationSeconds: analysis.durationSeconds, onsets: analysis.onsets, energy: analysis.energy };
+}
+
+describe("intensity", () => {
+  it("ranks each bar's loudness within the song, ignoring silence", () => {
+    const intensities = barIntensities([0, 0.6, 0.9, 0.6, 0.7]);
+    expect(intensities[1]).toBeCloseTo(intensities[3]!);
+    expect(intensities[2]).toBeGreaterThan(intensities[4]!);
+    expect(intensities[4]).toBeGreaterThan(intensities[1]!);
+    expect(Math.min(...intensities.slice(1))).toBeCloseTo(0.3 + (1.35 - 0.3) / 6);
+    expect(Math.max(...intensities)).toBeCloseTo(1.35);
+    expect(barIntensities([0.5])).toEqual([0.3 + (1.35 - 0.3) / 2]);
+  });
+
+  it.each(["Normal", "Expert", "ExpertPlus"] as const)("makes a loud chorus clearly busier than a quieter verse in %s, like human maps do", (difficulty) => {
+    const input = verseThenChorus();
+    const notes = generateChart(input, difficulty, FIXED_MAP_SEED, counter()).notes;
+    const seconds = (beat: number) => OFFSET + beat * (60 / BPM);
+    const verse = notes.filter((note) => seconds(note.beat) >= 5 && seconds(note.beat) < 28).length;
+    const chorus = notes.filter((note) => seconds(note.beat) >= 32 && seconds(note.beat) < 55).length;
+    expect(chorus / verse).toBeGreaterThan(1.6);
+  });
+});
 
 describe("generateChart", () => {
   it("gets denser with each difficulty", () => {

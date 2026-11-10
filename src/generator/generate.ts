@@ -17,7 +17,8 @@ export interface GeneratorInput {
 
 const BEATS_PER_BAR = 4;
 const SILENT_ENERGY = 0.08;
-const MIN_ENERGY_FACTOR = 0.5;
+const QUIETEST_BAR_INTENSITY = 0.3;
+const LOUDEST_BAR_INTENSITY = 1.35;
 const ONSET_WINDOW_SECONDS = 0.07;
 const WHOLE_BEAT_BONUS = 0.2;
 const DOWNBEAT_BONUS = 0.1;
@@ -121,16 +122,35 @@ export function barDivisions(input: GeneratorInput, profile: DifficultyProfile, 
   return triplet > straight ? profile.tripletDivisionsPerBeat : profile.divisionsPerBeat;
 }
 
+function barEnergy(input: GeneratorInput, barStart: number): number {
+  return energyAt(input.energy, beatToSeconds(barStart + BEATS_PER_BAR / 2, input.timing));
+}
+
+export function barIntensities(energies: readonly number[]): number[] {
+  const sounding = energies.filter((energy) => energy >= SILENT_ENERGY).sort((left, right) => left - right);
+  if (sounding.length <= 1) return energies.map(() => QUIETEST_BAR_INTENSITY + (LOUDEST_BAR_INTENSITY - QUIETEST_BAR_INTENSITY) / 2);
+  return energies.map((energy) => {
+    let below = 0;
+    while (below < sounding.length && sounding[below]! < energy) below += 1;
+    let atOrBelow = below;
+    while (atOrBelow < sounding.length && sounding[atOrBelow]! <= energy) atOrBelow += 1;
+    const percentile = (below + atOrBelow - 1) / 2 / (sounding.length - 1);
+    return QUIETEST_BAR_INTENSITY + (LOUDEST_BAR_INTENSITY - QUIETEST_BAR_INTENSITY) * percentile;
+  });
+}
+
 function chooseHits(input: GeneratorInput, profile: DifficultyProfile): Hit[] {
   const firstBeat = Math.max(0, Math.ceil(secondsToBeat(LEAD_IN_SECONDS, input.timing)));
   const lastBeat = Math.floor(secondsToBeat(input.durationSeconds - TAIL_SECONDS, input.timing));
   const barSeconds = BEATS_PER_BAR * secondsPerBeat(input.timing);
   const hits: Hit[] = [];
-  for (let barStart = firstBeat - (firstBeat % BEATS_PER_BAR); barStart <= lastBeat; barStart += BEATS_PER_BAR) {
-    const energy = energyAt(input.energy, beatToSeconds(barStart + BEATS_PER_BAR / 2, input.timing));
-    if (energy < SILENT_ENERGY) continue;
-    const energyFactor = MIN_ENERGY_FACTOR + (1 - MIN_ENERGY_FACTOR) * energy;
-    const target = Math.max(1, Math.round(profile.notesPerSecondAtFullEnergy * energyFactor * barSeconds));
+  const barStarts: number[] = [];
+  for (let barStart = firstBeat - (firstBeat % BEATS_PER_BAR); barStart <= lastBeat; barStart += BEATS_PER_BAR) barStarts.push(barStart);
+  const energies = barStarts.map((barStart) => barEnergy(input, barStart));
+  const intensities = barIntensities(energies);
+  for (const [index, barStart] of barStarts.entries()) {
+    if (energies[index]! < SILENT_ENERGY) continue;
+    const target = Math.max(1, Math.round(profile.notesPerSecondAtFullEnergy * intensities[index]! * barSeconds));
     const divisions = barDivisions(input, profile, barStart);
     const candidates: Hit[] = [];
     for (let step = 0; step < BEATS_PER_BAR * divisions; step += 1) {

@@ -31,6 +31,9 @@ and nothing is uploaded anywhere.
 - **Five real difficulties.** Easy, Normal, Hard, Expert and Expert+ are each
   drafted on their own from the song, never made by deleting notes from a harder
   one. Hard and up switch to triplets in bars where the music does.
+- **Calm verses, busy drops.** How busy each bar is follows how loud it is
+  compared with the rest of the same song, so a quiet verse breathes and the
+  drop hits hard, about as much as in human maps.
 - **Moves like a human map.** Where each note goes is learned from 43 curated
   and ranked community maps: forehand and backhand always alternate,
   downswings sit low and upswings start higher, angles and two-handed hits
@@ -197,18 +200,25 @@ curated and ranked maps (medians, human / auto):
 
 | | Easy | Normal | Hard | Expert | Expert+ |
 |---|---|---|---|---|---|
-| Notes per second | 1.67 / 1.66 | 2.27 / 2.39 | 3.22 / 3.31 | 3.96 / 4.01 | 5.23 / 5.32 |
+| Notes per second | 1.67 / 1.64 | 2.27 / 2.33 | 3.22 / 3.16 | 3.96 / 3.91 | 5.23 / 5.15 |
+| Calm-to-busy contrast | 0.32 / 0.26 | 0.29 / 0.29 | 0.26 / 0.23 | 0.25 / 0.28 | 0.29 / 0.23 |
 | Forehand/backhand alternation | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
 | Downswings on the bottom row | 0.99 / 0.99 | 0.99 / 0.99 | 0.94 / 0.95 | 0.91 / 0.91 | 0.81 / 0.81 |
-| Upswings above the bottom row | 0.82 / 0.81 | 0.86 / 0.83 | 0.89 / 0.85 | 0.92 / 0.89 | 0.91 / 0.92 |
-| Two-handed hits | 0.07 / 0.07 | 0.11 / 0.13 | 0.12 / 0.12 | 0.15 / 0.16 | 0.21 / 0.22 |
+| Upswings above the bottom row | 0.82 / 0.80 | 0.86 / 0.83 | 0.89 / 0.84 | 0.92 / 0.89 | 0.91 / 0.92 |
+| Two-handed hits | 0.07 / 0.08 | 0.11 / 0.12 | 0.12 / 0.12 | 0.15 / 0.14 | 0.21 / 0.23 |
+
+Calm-to-busy contrast is how much the number of notes changes from one
+4-second stretch to the next (standard deviation over mean); before bar
+loudness was ranked within each song it was about half the human figure.
+The auto-maps get no warnings from the app's own checks (vision blocks,
+crossovers, fast same-hand hits, parity) on any of the 41 songs.
 
 Rhythm is the biggest remaining difference: the share of human notes that the
-auto-map also hits within 50 ms is 0.32 on Easy, 0.39 on Normal, 0.51 on Hard,
-0.59 on Expert and 0.68 on Expert+ (Easy to Expert were 0.22, 0.31, 0.47 and
+auto-map also hits within 50 ms is 0.31 on Easy, 0.40 on Normal, 0.54 on Hard,
+0.57 on Expert and 0.67 on Expert+ (Easy to Expert were 0.22, 0.31, 0.47 and
 0.59 before the beat was taken from the kick drum). On 11 maps held back from
 learning, alternation stays at 1.00 for every difficulty and Hard, Expert and
-Expert+ density lands within 6% of the human map.
+Expert+ density lands within 4% of the human map.
 `scripts/learn-flow.ts` rebuilds `src/generator/flowTable.json` from a folder
 of maps; only counts of moves are kept, never the maps themselves.
 
