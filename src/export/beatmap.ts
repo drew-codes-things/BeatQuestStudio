@@ -1,5 +1,5 @@
 import type { Chart, CutDirection, Difficulty, NoteColor, Project, Timing } from "../core/model";
-import { DIFFICULTIES, chartObjectCount } from "../core/model";
+import { DIFFICULTIES, chartObjectCount, isHexColor } from "../core/model";
 import { secondsPerBeat } from "../core/timing";
 
 export const INFO_VERSION = "2.1.0";
@@ -11,6 +11,8 @@ const ALL_DIRECTIONS_ENVIRONMENT = "GlassDesertEnvironment";
 const BEAT_PRECISION = 10000;
 const DEFAULT_SHUFFLE_PERIOD = 0.5;
 const BEATS_PER_BAR = 4;
+export const COLOR_SCHEME_ID = "BeatQuest Studio";
+const CHANNEL_MAX = 255;
 
 export const DIFFICULTY_RANKS: Record<Difficulty, number> = { Easy: 1, Normal: 3, Hard: 5, Expert: 7, ExpertPlus: 9 };
 
@@ -102,6 +104,38 @@ export function exportedDifficulties(project: Project): Difficulty[] {
   return DIFFICULTIES.filter((difficulty) => chartObjectCount(project.charts[difficulty]) > 0);
 }
 
+interface GameColor {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+export function gameColor(hex: string): GameColor {
+  const channel = (start: number) => parseInt(hex.slice(start, start + 2), 16) / CHANNEL_MAX;
+  return { r: channel(1), g: channel(3), b: channel(5), a: 1 };
+}
+
+export function colorSchemes(project: Project): unknown[] {
+  const colors = project.saberColors;
+  if (!colors || !isHexColor(colors.left) || !isHexColor(colors.right)) return [];
+  const left = gameColor(colors.left);
+  const right = gameColor(colors.right);
+  return [{
+    useOverride: true,
+    colorScheme: {
+      colorSchemeId: COLOR_SCHEME_ID,
+      saberAColor: left,
+      saberBColor: right,
+      environmentColor0: left,
+      environmentColor1: right,
+      obstaclesColor: left,
+      environmentColor0Boost: left,
+      environmentColor1Boost: right,
+    },
+  }];
+}
+
 export function buildInfo(project: Project, coverFileName: string): Record<string, unknown> {
   if (!project.song) throw new Error("cannot build Info.dat without a song");
   const song = project.song;
@@ -122,7 +156,7 @@ export function buildInfo(project: Project, coverFileName: string): Record<strin
     _environmentName: ENVIRONMENT,
     _allDirectionsEnvironmentName: ALL_DIRECTIONS_ENVIRONMENT,
     _environmentNames: [ENVIRONMENT],
-    _colorSchemes: [],
+    _colorSchemes: colorSchemes(project),
     _difficultyBeatmapSets: [{
       _beatmapCharacteristicName: CHARACTERISTIC,
       _difficultyBeatmaps: exportedDifficulties(project).map((difficulty) => ({

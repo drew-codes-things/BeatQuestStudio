@@ -45,6 +45,9 @@ and nothing is uploaded anywhere.
   `03_Artist_-_Song_(Official_Video)_[HD].mp4` becomes "Song" by "Artist".
   Every song gets a cover: its own album art, or a generated one, each with a
   small DrewBeat badge. A cover you upload yourself is never replaced.
+- **Your own saber colours.** Pick a left and a right colour on the Song tab
+  and the map carries them as its colour scheme: the cubes take their saber's
+  colour in the game, the lights follow, and the editor draws the cubes in them.
 - **Batch mode.** Drop a pile of songs or a whole folder anywhere on the page
   and every one becomes its own mapped project, worked through one at a time.
   A song you have already made is spotted by its title, artist and length and

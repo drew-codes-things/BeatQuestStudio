@@ -1,6 +1,6 @@
 import type { WaveformPeaks } from "../../audio/analysis";
 import { allObjects, type ChartObject, objectEndBeat } from "../../core/edit";
-import { type Chart, GRID_COLUMNS, GRID_ROWS, type Timing } from "../../core/model";
+import { type Chart, GRID_COLUMNS, GRID_ROWS, isHexColor, type NoteColor, type SaberColors, type Timing } from "../../core/model";
 import { beatToSeconds } from "../../core/timing";
 import {
   arrowRotationDegrees,
@@ -40,6 +40,15 @@ export const COLORS = {
   marquee: "rgba(59,139,255,0.18)",
 } as const;
 
+export type NotePalette = Record<NoteColor, string>;
+
+export function paletteFor(saberColors: SaberColors | null | undefined): NotePalette {
+  return {
+    red: isHexColor(saberColors?.left) ? saberColors.left : COLORS.red,
+    blue: isHexColor(saberColors?.right) ? saberColors.right : COLORS.blue,
+  };
+}
+
 const BEATS_PER_BAR = 4;
 const NOTE_SIZE = 14;
 const MIN_SNAP_LINE_SPACING = 8;
@@ -71,10 +80,12 @@ export interface TimelineScene {
   dragPreview: DragPreview | null;
   marquee: Marquee | null;
   wallPreview: { fromBeat: number; toBeat: number; column: number; width: number } | null;
+  palette: NotePalette;
 }
 
 function shiftedCell(object: { x: number; y: number }, preview: DragPreview | null, id: string): Cell {
   if (!preview || !preview.ids.has(id)) return { x: object.x, y: object.y };
+
   return { x: object.x + preview.columns, y: object.y + preview.rows };
 }
 
@@ -191,7 +202,7 @@ function drawSliders(context: CanvasRenderingContext2D, scene: TimelineScene): v
     const tailBeat = shiftedBeat(slider.tailBeat, scene.dragPreview, slider.id);
     const head = shiftedCell(slider, scene.dragPreview, slider.id);
     const tail = shiftedCell({ x: slider.tailX, y: slider.tailY }, scene.dragPreview, slider.id);
-    context.strokeStyle = slider.color === "red" ? COLORS.red : COLORS.blue;
+    context.strokeStyle = scene.palette[slider.color];
     context.lineWidth = scene.selection.has(slider.id) ? 4 : 2.5;
     context.setLineDash(slider.dashed ? [4, 3] : []);
     context.beginPath();
@@ -241,7 +252,7 @@ function drawNotesAndBombs(context: CanvasRenderingContext2D, scene: TimelineSce
     const x = beatToX(shiftedBeat(note.beat, scene.dragPreview, note.id), scene.viewport);
     if (!visible(x)) continue;
     const y = laneCentre(shiftedCell(note, scene.dragPreview, note.id));
-    context.fillStyle = note.color === "red" ? COLORS.red : COLORS.blue;
+    context.fillStyle = scene.palette[note.color];
     context.fillRect(x - NOTE_SIZE / 2, y - NOTE_SIZE / 2, NOTE_SIZE, NOTE_SIZE);
     if (scene.selection.has(note.id)) {
       context.strokeStyle = COLORS.selection;

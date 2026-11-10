@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { type Chart, GRID_COLUMNS, GRID_ROWS } from "../../core/model";
 import { arrowRotationDegrees } from "./geometry";
-import { COLORS, drawArrow } from "./timelineDraw";
+import { COLORS, drawArrow, type NotePalette } from "./timelineDraw";
 
 const WIDTH = 360;
 const HEIGHT = 260;
@@ -16,6 +16,7 @@ const FLOOR_Y = HEIGHT * 0.95;
 interface Preview3DProps {
   chart: Chart;
   beat: number;
+  palette: NotePalette;
 }
 
 interface Projected {
@@ -53,7 +54,7 @@ function drawFloor(context: CanvasRenderingContext2D): void {
   }
 }
 
-function drawScene(context: CanvasRenderingContext2D, { chart, beat }: Preview3DProps): void {
+function drawScene(context: CanvasRenderingContext2D, { chart, beat, palette }: Preview3DProps): void {
   drawFloor(context);
   const inView = (start: number) => start >= beat - 0.05 && start <= beat + VIEW_BEATS;
   for (const wall of chart.walls) {
@@ -72,7 +73,7 @@ function drawScene(context: CanvasRenderingContext2D, { chart, beat }: Preview3D
     if (!inView(slider.beat) && !inView(slider.tailBeat)) continue;
     const head = project(slider.x, slider.y, depthOf(Math.max(beat, slider.beat), beat));
     const tail = project(slider.tailX, slider.tailY, depthOf(Math.min(beat + VIEW_BEATS, slider.tailBeat), beat));
-    context.strokeStyle = slider.color === "red" ? COLORS.red : COLORS.blue;
+    context.strokeStyle = palette[slider.color];
     context.lineWidth = 3 * head.scale;
     context.beginPath();
     context.moveTo(head.x, head.y);
@@ -90,7 +91,7 @@ function drawScene(context: CanvasRenderingContext2D, { chart, beat }: Preview3D
     const size = 46 * point.scale;
     context.globalAlpha = Math.min(1, 0.35 + point.scale);
     if (object.note) {
-      context.fillStyle = object.note.color === "red" ? COLORS.red : COLORS.blue;
+      context.fillStyle = palette[object.note.color];
       context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
       drawArrow(context, point.x, point.y, size, arrowRotationDegrees(object.note.direction));
     } else {

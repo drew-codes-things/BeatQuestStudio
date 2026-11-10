@@ -66,6 +66,35 @@ describe("Info.dat", () => {
     expect(difficultyLabel("Hard")).toBe("Hard");
   });
 
+  it("leaves the colour schemes empty when the map has no saber colours of its own", () => {
+    expect(buildInfo(project(), "cover.png")._colorSchemes).toEqual([]);
+  });
+
+  it("writes the saber colours as a full colour scheme every difficulty uses", () => {
+    const coloured = { ...project(), saberColors: { left: "#ff8000", right: "#00ff80" } };
+    const info = buildInfo(coloured, "cover.png");
+    const [scheme] = info._colorSchemes as { useOverride: boolean; colorScheme: Record<string, unknown> }[];
+    const orange = { r: 1, g: 128 / 255, b: 0, a: 1 };
+    const green = { r: 0, g: 1, b: 128 / 255, a: 1 };
+    expect(scheme!.useOverride).toBe(true);
+    expect(scheme!.colorScheme).toEqual({
+      colorSchemeId: "BeatQuest Studio",
+      saberAColor: orange,
+      saberBColor: green,
+      environmentColor0: orange,
+      environmentColor1: green,
+      obstaclesColor: orange,
+      environmentColor0Boost: orange,
+      environmentColor1Boost: green,
+    });
+    const beatmaps = (info._difficultyBeatmapSets as { _difficultyBeatmaps: Record<string, unknown>[] }[])[0]!._difficultyBeatmaps;
+    expect(beatmaps.every((entry) => entry._beatmapColorSchemeIdx === 0)).toBe(true);
+  });
+
+  it("ignores saber colours that are not #rrggbb", () => {
+    expect(buildInfo({ ...project(), saberColors: { left: "red", right: "#00ff80" } }, "cover.png")._colorSchemes).toEqual([]);
+  });
+
   it("refuses to build without a song", () => {
     expect(() => buildInfo(newProject("x", "x", 0), "cover.png")).toThrow(/without a song/);
   });

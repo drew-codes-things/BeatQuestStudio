@@ -209,7 +209,49 @@ async function runEditorFlow(page, shoot) {
   await pause(1500);
   await shoot("05-playing");
   await clickButton(page, "Pause");
+  await chooseSaberColors(page, shoot);
   await expectText(page, "All changes saved");
+}
+
+const LEFT_SABER = "#ff8000";
+const RIGHT_SABER = "#00c8ff";
+
+async function setColorInput(page, label, value) {
+  await page.$eval(`input[aria-label="${label}"]`, (input, color) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setter.call(input, color);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }, value);
+}
+
+async function gridHasColor(page, hex) {
+  const wanted = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+  return page.$$eval("canvas", (canvases, rgb) => canvases.some((canvas) => {
+    const context = canvas.getContext("2d");
+    if (!context || canvas.width === 0 || canvas.height === 0) return false;
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] === rgb[0] && pixels[index + 1] === rgb[1] && pixels[index + 2] === rgb[2]) return true;
+    }
+    return false;
+  }), wanted);
+}
+
+async function chooseSaberColors(page, shoot) {
+  await clickButton(page, "Song");
+  await page.click('[data-testid="saber-colors"] input[type="checkbox"]');
+  await page.waitForSelector('input[aria-label="Left saber colour"]');
+  await setColorInput(page, "Left saber colour", LEFT_SABER);
+  await setColorInput(page, "Right saber colour", RIGHT_SABER);
+  await shoot("05b-saber-colours");
+  await clickButton(page, "Map");
+  await page.waitForSelector('[data-testid="timeline"]');
+  await pause(300);
+  const left = await gridHasColor(page, LEFT_SABER);
+  const right = await gridHasColor(page, RIGHT_SABER);
+  if (!left || !right) throw new Error(`the editor does not draw the chosen saber colours (left ${left}, right ${right})`);
+  await shoot("05c-coloured-notes");
+  console.log(`saber colours: ${LEFT_SABER} and ${RIGHT_SABER} chosen on the Song tab, the editor draws notes in both`);
 }
 
 async function waitForZip(prefix = "") {
@@ -255,7 +297,12 @@ async function runExport(page, shoot, browser) {
   const song = probeCodec(songPath);
   if (song.codec !== "vorbis") throw new Error(`song.egg is ${song.codec}, not vorbis`);
   const difficultyCount = info._difficultyBeatmapSets[0]._difficultyBeatmaps.length;
-  console.log(`export: ${zipName}, cover ${cover}, Info ${info._version} at ${info._beatsPerMinute} BPM, ${difficultyCount} difficulties, Expert v${expert.version} with ${expert.colorNotes.length} notes, song.egg vorbis ${song.durationSeconds.toFixed(2)}s`);
+  const scheme = info._colorSchemes?.[0]?.colorScheme;
+  const channel = (hex, start) => parseInt(hex.slice(start, start + 2), 16) / 255;
+  const matches = (color, hex) => color && [color.r, color.g, color.b].every((value, index) => Math.abs(value - channel(hex, 1 + index * 2)) < 1e-6);
+  if (!matches(scheme?.saberAColor, LEFT_SABER) || !matches(scheme?.saberBColor, RIGHT_SABER)) throw new Error(`Info.dat colour scheme is ${JSON.stringify(info._colorSchemes)}`);
+  if (!info._difficultyBeatmapSets[0]._difficultyBeatmaps.every((entry) => entry._beatmapColorSchemeIdx === 0)) throw new Error("a difficulty does not use the map's colour scheme");
+  console.log(`export: ${zipName}, cover ${cover}, Info ${info._version} at ${info._beatsPerMinute} BPM, ${difficultyCount} difficulties, saber colours in Info.dat, Expert v${expert.version} with ${expert.colorNotes.length} notes, song.egg vorbis ${song.durationSeconds.toFixed(2)}s`);
 }
 
 function writeBatchExtras() {

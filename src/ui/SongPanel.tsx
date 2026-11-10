@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { measureGridDriftMs } from "../audio/beatGrid";
 import { IMPORT_ACCEPT } from "../audio/decode";
-import { DIFFICULTIES, difficultyLabel, type Project, type SongInfo } from "../core/model";
+import { DEFAULT_SABER_COLORS, DIFFICULTIES, difficultyLabel, type Project, type SaberColors, type SongInfo } from "../core/model";
 import { beatToSeconds, validateBpm } from "../core/timing";
 import type { ProjectStore } from "../storage/projectStore";
 import { DRIFT_WARNING_MS } from "../validation/validate";
@@ -30,6 +30,34 @@ function TextField({ label, value, onCommit }: { label: string; value: string; o
       <input type="text" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={() => draft !== value && onCommit(draft)}
         onKeyDown={(event) => event.key === "Enter" && (event.target as HTMLInputElement).blur()} />
     </label>
+  );
+}
+
+function SaberColorsCard({ colors, onChange }: { colors: SaberColors | null; onChange: (colors: SaberColors | null) => void }) {
+  return (
+    <section className="card" data-testid="saber-colors">
+      <h3>Saber colours</h3>
+      <label className="check">
+        <input type="checkbox" checked={colors !== null} onChange={(event) => onChange(event.target.checked ? { ...DEFAULT_SABER_COLORS } : null)} />
+        Use my own colours for this map
+      </label>
+      {colors && (
+        <div className="field-grid">
+          <label className="field">
+            <span>Left saber</span>
+            <input type="color" aria-label="Left saber colour" value={colors.left} onChange={(event) => onChange({ ...colors, left: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Right saber</span>
+            <input type="color" aria-label="Right saber colour" value={colors.right} onChange={(event) => onChange({ ...colors, right: event.target.value })} />
+          </label>
+        </div>
+      )}
+      <p className="meta">
+        In Beat Saber the cubes always take their saber's colour, so changing a saber recolours its cubes too. The lights follow the
+        sabers and walls take the left colour. The editor shows the cubes in these colours.
+      </p>
+    </section>
   );
 }
 
@@ -173,6 +201,7 @@ export function SongPanel({ project, store, session, busy, onImport, onChange }:
             {coverUrl ? <img className="cover" src={coverUrl} alt="Cover" /> : <p className="meta">No cover yet: one is made from the title when you export.</p>}
             <input type="file" accept={COVER_ACCEPT} aria-label="Upload cover" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCover(file); }} />
           </section>
+          <SaberColorsCard colors={project.saberColors ?? null} onChange={(saberColors) => onChange((current) => ({ ...current, saberColors }))} />
           <section className="card">
             <h3>Note speed</h3>
             <div className="field-grid">

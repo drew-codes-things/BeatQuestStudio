@@ -104,6 +104,20 @@ export interface Project {
   timing: Timing;
   charts: Record<Difficulty, Chart>;
   settings: Record<Difficulty, DifficultySettings>;
+  saberColors?: SaberColors | null;
+}
+
+export interface SaberColors {
+  left: string;
+  right: string;
+}
+
+export const DEFAULT_SABER_COLORS: SaberColors = { left: "#c81414", right: "#288ed2" };
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+export function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && HEX_COLOR.test(value);
 }
 
 export const DEFAULT_BPM = 120;

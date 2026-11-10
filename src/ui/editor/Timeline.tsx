@@ -5,12 +5,13 @@ import { type Chart, GRID_COLUMNS, type Timing } from "../../core/model";
 import { snapBeat } from "../../core/timing";
 import { type Cell, cellOfLane, laneAtY, laneOf, LANES_TOP, LANE_HEIGHT, TIMELINE_HEIGHT, type Viewport, xToBeat, zoomAround } from "./geometry";
 import type { PlacementSettings } from "./placement";
-import { type DragPreview, drawTimeline, type Marquee, objectAtPoint, objectsInMarquee } from "./timelineDraw";
+import { type DragPreview, drawTimeline, type Marquee, type NotePalette, objectAtPoint, objectsInMarquee } from "./timelineDraw";
 
 export type SelectMode = "replace" | "toggle" | "add";
 
 interface TimelineProps {
   chart: Chart;
+  palette: NotePalette;
   selection: ReadonlySet<string>;
   cursorBeat: number;
   playheadBeat: number | null;
@@ -85,7 +86,7 @@ export function Timeline(props: TimelineProps) {
     canvas.height = TIMELINE_HEIGHT * ratio;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     drawTimeline(context, {
-      width, chart: props.chart, selection: props.selection, cursorBeat: props.cursorBeat, playheadBeat: props.playheadBeat,
+      width, chart: props.chart, palette: props.palette, selection: props.selection, cursorBeat: props.cursorBeat, playheadBeat: props.playheadBeat,
       viewport: props.viewport, timing: props.timing, peaks: props.peaks, snap: props.snap, dragPreview, marquee, wallPreview,
     }, TIMELINE_HEIGHT);
   });

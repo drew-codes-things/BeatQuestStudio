@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   allObjects,
   BEAT_EPSILON,
@@ -24,6 +24,7 @@ import { GridPanel } from "./GridPanel";
 import { arcFromSelection, chainFromSelection, type PlacementSettings, placeAt, placeWall, type SliderResult, type Tool } from "./placement";
 import { Preview3D } from "./Preview3D";
 import { type SelectMode, Timeline } from "./Timeline";
+import { paletteFor } from "./timelineDraw";
 
 export interface EditorFocus {
   difficulty: Difficulty;
@@ -64,6 +65,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function Editor(props: EditorProps) {
   const { project, difficulty, session } = props;
   const chart = project.charts[difficulty];
+  const palette = useMemo(() => paletteFor(project.saberColors), [project.saberColors]);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [cursorBeat, setCursorBeat] = useState(0);
   const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
@@ -329,6 +331,7 @@ export function Editor(props: EditorProps) {
       <div ref={(element) => { if (element) timelineWidth.current = element.clientWidth; }}>
         <Timeline
           chart={chart}
+          palette={palette}
           selection={selection}
           cursorBeat={cursorBeat}
           playheadBeat={playheadBeat}
@@ -355,13 +358,13 @@ export function Editor(props: EditorProps) {
       <div className="editor-lower">
         <div>
           <h4>Grid at the cursor</h4>
-          <GridPanel chart={chart} beat={cursorBeat} selection={selection} onCellClick={onGridClick} onCellDelete={onGridDelete} />
+          <GridPanel chart={chart} palette={palette} beat={cursorBeat} selection={selection} onCellClick={onGridClick} onCellDelete={onGridDelete} />
           <p className="hint">Click a cell to place. Drag across a cell to choose the cut direction. Right-click to delete.</p>
         </div>
         {previewShown && (
           <div>
             <h4>3D preview</h4>
-            <Preview3D chart={chart} beat={shownBeat} />
+            <Preview3D chart={chart} beat={shownBeat} palette={palette} />
           </div>
         )}
         <ShortcutHelp />

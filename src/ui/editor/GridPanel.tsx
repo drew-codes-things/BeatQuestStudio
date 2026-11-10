@@ -2,7 +2,7 @@ import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 
 import { BEAT_EPSILON } from "../../core/edit";
 import { type Chart, type CutDirection, GRID_COLUMNS, GRID_ROWS } from "../../core/model";
 import { arrowRotationDegrees, type Cell, directionFromDrag } from "./geometry";
-import { COLORS, drawArrow } from "./timelineDraw";
+import { COLORS, drawArrow, type NotePalette } from "./timelineDraw";
 
 const CELL_SIZE = 76;
 const LOOKAHEAD_BEATS = 2;
@@ -11,6 +11,7 @@ const PANEL_HEIGHT = CELL_SIZE * GRID_ROWS;
 
 interface GridPanelProps {
   chart: Chart;
+  palette: NotePalette;
   beat: number;
   selection: ReadonlySet<string>;
   onCellClick: (cell: Cell, direction: CutDirection | null, additive: boolean) => void;
@@ -68,7 +69,7 @@ function drawGrid(context: CanvasRenderingContext2D, props: GridPanelProps): voi
     const centreY = top + CELL_SIZE / 2;
     context.globalAlpha = isCurrent ? 1 : 0.45 - 0.3 * distance;
     if (object.note) {
-      context.fillStyle = object.note.color === "red" ? COLORS.red : COLORS.blue;
+      context.fillStyle = props.palette[object.note.color];
       context.fillRect(centreX - size / 2, centreY - size / 2, size, size);
       drawArrow(context, centreX, centreY, size, arrowRotationDegrees(object.note.direction));
     } else {
