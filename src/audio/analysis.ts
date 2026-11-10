@@ -13,6 +13,8 @@ const TEMPO_PRIOR_CENTER_BPM = 120;
 const TEMPO_PRIOR_WIDTH_OCTAVES = 0.9;
 const FINE_SEARCH_FRACTION = 0.03;
 const FINE_SEARCH_STEP_BPM = 0.005;
+const KICK_PHASE_STEP_SECONDS = 0.002;
+const KICK_FILTER_STAGES = 2;
 const ONSET_MIN_GAP_SECONDS = 0.06;
 const ONSET_THRESHOLD_WINDOW_SECONDS = 1;
 const ONSET_THRESHOLD_STD_FACTOR = 0.6;
@@ -125,6 +127,12 @@ export function lowPass(samples: Float32Array, sampleRate: number, cutoffHz: num
   return filtered;
 }
 
+function kickBand(samples: Float32Array, sampleRate: number): Float32Array {
+  let filtered = samples;
+  for (let stage = 0; stage < KICK_FILTER_STAGES; stage += 1) filtered = lowPass(filtered, sampleRate, LOW_BAND_CUTOFF_HZ);
+  return filtered;
+}
+
 export function onsetEnvelope(samples: Float32Array, sampleRate: number, hopSize: number = ANALYSIS_HOP_SIZE): Envelope {
   const hopSeconds = hopSize / sampleRate;
   const energies = frameEnergies(samples, hopSize);
@@ -186,6 +194,30 @@ function envelopeAt(envelope: Envelope, seconds: number): number {
   let peak = 0;
   for (let index = Math.max(0, frame - 2); index <= Math.min(envelope.values.length - 1, frame + 2); index += 1) peak = Math.max(peak, envelope.values[index]!);
   return peak;
+}
+
+function interpolatedEnvelopeAt(envelope: Envelope, seconds: number): number {
+  const position = seconds / envelope.hopSeconds;
+  const frame = Math.floor(position);
+  if (frame < 0 || frame + 1 >= envelope.values.length) return 0;
+  const fraction = position - frame;
+  return envelope.values[frame]! * (1 - fraction) + envelope.values[frame + 1]! * fraction;
+}
+
+export function alignToKick(tempo: TempoEstimate, kickEnvelope: Envelope, durationSeconds: number): TempoEstimate {
+  if (tempo.confidence === 0) return tempo;
+  const period = 60 / tempo.bpm;
+  let bestPhase = tempo.offsetSeconds;
+  let bestScore = 0;
+  for (let phase = 0; phase < period; phase += KICK_PHASE_STEP_SECONDS) {
+    let score = 0;
+    for (let seconds = phase; seconds < durationSeconds; seconds += period) score += interpolatedEnvelopeAt(kickEnvelope, seconds);
+    if (score > bestScore) {
+      bestScore = score;
+      bestPhase = phase;
+    }
+  }
+  return { ...tempo, offsetSeconds: bestPhase };
 }
 
 export function alignToDownbeat(tempo: TempoEstimate, bassEnvelope: Envelope, durationSeconds: number): TempoEstimate {
@@ -309,12 +341,13 @@ export function analyseSong(channels: readonly Float32Array[], sampleRate: numbe
   const mono = mixToMono(channels);
   const envelope = onsetEnvelope(mono, sampleRate);
   const bassEnvelope = onsetEnvelope(lowPass(mono, sampleRate, LOW_BAND_CUTOFF_HZ), sampleRate);
+  const kickEnvelope = onsetEnvelope(kickBand(mono, sampleRate), sampleRate);
   const durationSeconds = mono.length / sampleRate;
   const attack = attackCurve(mono, sampleRate);
   return {
     durationSeconds,
     attack,
-    tempo: alignToDownbeat(refineTempo(preferFasterTempo(estimateTempo(envelope), envelope, bassEnvelope), attack, durationSeconds), bassEnvelope, durationSeconds),
+    tempo: alignToDownbeat(refineTempo(alignToKick(preferFasterTempo(estimateTempo(envelope), envelope, bassEnvelope), kickEnvelope, durationSeconds), attack, durationSeconds), bassEnvelope, durationSeconds),
     onsets: detectOnsets(envelope),
     energy: energyCurve(mono, sampleRate),
   };

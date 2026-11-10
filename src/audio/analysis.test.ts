@@ -35,6 +35,21 @@ describe("tempo and offset", () => {
     expect(tempo.driftMs).toBeLessThan(5);
   });
 
+  it.each([
+    { bpm: 128, firstDownbeatSeconds: 0.437, stabEveryBeatAt: 0.75, stabLevel: 0.5 },
+    { bpm: 128, firstDownbeatSeconds: 0.437, stabEveryBeatAt: 0.75, stabLevel: 0.7 },
+    { bpm: 100, firstDownbeatSeconds: 0.25, stabEveryBeatAt: 0.75, stabLevel: 0.6 },
+    { bpm: 100, firstDownbeatSeconds: 0.25, stabEveryBeatAt: 0.25, stabLevel: 0.7 },
+    { bpm: 116, firstDownbeatSeconds: 0.6, stabEveryBeatAt: 0.75, stabLevel: 0.7 },
+  ])("keeps the beat on the kick with a syncopated stab at $stabEveryBeatAt of the beat, level $stabLevel, $bpm BPM", ({ bpm, firstDownbeatSeconds, stabEveryBeatAt, stabLevel }) => {
+    const samples = makeBandTrack({ bpm, firstDownbeatSeconds, durationSeconds: 60, sampleRate: 44100, jitterMs: 4, stabEveryBeatAt, stabLevel });
+    const { tempo } = analyseSong([samples], 44100);
+    expect(Math.abs(tempo.bpm - bpm)).toBeLessThan(0.05);
+    const beat = 60 / bpm;
+    const beatError = ((tempo.offsetSeconds - firstDownbeatSeconds) % beat + beat * 1.5) % beat - beat / 2;
+    expect(Math.abs(beatError) * 1000).toBeLessThan(5);
+  });
+
   it("puts beat 1 on the bar's downbeat when the downbeat is distinct", () => {
     const bpm = 124;
     const samples = makeBandTrack({ bpm, firstDownbeatSeconds: 0.73, durationSeconds: 60, sampleRate: 44100, jitterMs: 4, kickOnThree: false });

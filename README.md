@@ -194,14 +194,18 @@ curated and ranked maps (medians, human / auto):
 
 | | Easy | Normal | Hard | Expert |
 |---|---|---|---|---|
-| Notes per second | 1.67 / 1.68 | 2.27 / 2.41 | 3.22 / 3.28 | 3.96 / 4.30 |
+| Notes per second | 1.67 / 1.66 | 2.27 / 2.39 | 3.22 / 3.31 | 3.96 / 4.41 |
 | Forehand/backhand alternation | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
-| Downswings on the bottom row | 0.99 / 0.99 | 0.99 / 0.99 | 0.94 / 0.95 | 0.91 / 0.91 |
-| Upswings above the bottom row | 0.82 / 0.81 | 0.86 / 0.84 | 0.89 / 0.85 | 0.92 / 0.90 |
-| Two-handed hits | 0.07 / 0.08 | 0.11 / 0.15 | 0.12 / 0.12 | 0.15 / 0.19 |
+| Downswings on the bottom row | 0.99 / 0.99 | 0.99 / 0.99 | 0.94 / 0.95 | 0.91 / 0.92 |
+| Upswings above the bottom row | 0.82 / 0.81 | 0.86 / 0.83 | 0.89 / 0.85 | 0.92 / 0.90 |
+| Two-handed hits | 0.07 / 0.07 | 0.11 / 0.13 | 0.12 / 0.12 | 0.15 / 0.20 |
 
-On 11 maps held back from learning, alternation stays at 1.00 for every
-difficulty and Hard and Expert density lands within 3% of the human map.
+Rhythm is the biggest remaining difference: the share of human notes that the
+auto-map also hits within 50 ms is 0.32 on Easy, 0.39 on Normal, 0.51 on Hard
+and 0.60 on Expert (it was 0.22, 0.31, 0.47 and 0.59 before the beat was
+taken from the kick drum). On 11 maps held back from learning, alternation
+stays at 1.00 for every difficulty and Hard and Expert density lands within 5%
+of the human map.
 `scripts/learn-flow.ts` rebuilds `src/generator/flowTable.json` from a folder
 of maps; only counts of moves are kept, never the maps themselves.
 

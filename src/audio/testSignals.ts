@@ -47,6 +47,8 @@ export interface BandTrackOptions {
   jitterMs: number;
   seed?: number;
   kickOnThree?: boolean;
+  stabEveryBeatAt?: number;
+  stabLevel?: number;
 }
 
 const KICK_SECONDS = 0.25;
@@ -62,6 +64,20 @@ function addKick(samples: Float32Array, start: number, sampleRate: number): void
     const time = offset / sampleRate;
     phase += (2 * Math.PI * (50 + 110 * Math.exp(-time * 35))) / sampleRate;
     samples[start + offset]! += 0.8 * Math.exp(-time * 14) * Math.sin(phase);
+  }
+}
+
+const STAB_SECONDS = 0.12;
+const DEFAULT_STAB_LEVEL = 0.2;
+const STAB_FREQUENCIES_HZ = [523.25, 659.25, 783.99];
+
+function addStab(samples: Float32Array, start: number, sampleRate: number, level: number): void {
+  const length = Math.round(STAB_SECONDS * sampleRate);
+  for (let offset = 0; offset < length && start + offset < samples.length; offset += 1) {
+    const time = offset / sampleRate;
+    let tone = 0;
+    for (const frequency of STAB_FREQUENCIES_HZ) tone += Math.sin(2 * Math.PI * frequency * time);
+    samples[start + offset]! += level * Math.exp(-time * 18) * tone;
   }
 }
 
@@ -91,6 +107,7 @@ export function makeBandTrack(options: BandTrackOptions): Float32Array {
     if (beatInBar === 0 || (kickOnThree && beatInBar === 2)) addKick(samples, indexOf(beatTime + jitter()), sampleRate);
     if (beatInBar === 1 || beatInBar === 3) addNoiseHit(samples, indexOf(beatTime + jitter()), sampleRate, SNARE_SECONDS, 0.45, 22, random, false);
     addNoiseHit(samples, indexOf(beatTime + jitter()), sampleRate, HAT_SECONDS, eighth % 2 === 0 ? 0.12 : 0.08, 90, random, true);
+    if (options.stabEveryBeatAt !== undefined && eighth % 2 === 0) addStab(samples, indexOf(beatTime + options.stabEveryBeatAt * period + jitter()), sampleRate, options.stabLevel ?? DEFAULT_STAB_LEVEL);
   }
   for (let index = 0; index < samples.length; index += 1) {
     const seconds = index / sampleRate - options.firstDownbeatSeconds;
