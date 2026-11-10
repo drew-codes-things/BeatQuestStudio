@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AudioWorkerClient } from "../audio/workerProtocol";
-import type { Project } from "../core/model";
+import { difficultyLabel, type Project } from "../core/model";
 import { mapFolderName } from "../export/beatmap";
 import { zipMapFiles } from "../export/package";
 import { downloadBytes, prepareMapFiles } from "../export/prepare";
@@ -29,7 +29,7 @@ function IssueList({ issues, onFocus }: { issues: Issue[]; onFocus: (focus: Edit
         return (
           <li key={`${issue.code}-${index}`} className={issue.severity}>
             <span className="severity">{issue.severity === "error" ? "Error" : "Warning"}</span>
-            {issue.difficulty && <span className="difficulty">{issue.difficulty}</span>}
+            {issue.difficulty && <span className="difficulty">{difficultyLabel(issue.difficulty)}</span>}
             <span className="spacer">{issue.message}</span>
             {canJump && <button onClick={() => onFocus({ difficulty: issue.difficulty!, beat: issue.beat!, ids: issue.objectIds })}>Show</button>}
           </li>

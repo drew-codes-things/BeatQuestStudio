@@ -19,7 +19,7 @@ const VIDEO_PATTERN = /\.(mp4|webm|mov)$/;
 const OVERSIZE_BYTES = 300 * 1024 * 1024;
 const BATCH_FILES = ["song.opus", "clip.mp4", "song.flac", "03_Test_Artist_-_Night_Drive_(Official_Video)_[HD].mp4", "huge.mp3", "notes.txt"];
 const BATCH_TIMEOUT_MS = 120_000;
-const EXPECTED_ZIP_FILES = ["EasyStandard.dat", "ExpertStandard.dat", "HardStandard.dat", "Info.dat", "NormalStandard.dat", "cover.png", "song.egg"];
+const EXPECTED_ZIP_FILES = ["EasyStandard.dat", "ExpertPlusStandard.dat", "ExpertStandard.dat", "HardStandard.dat", "Info.dat", "NormalStandard.dat", "cover.png", "song.egg"];
 
 const pause = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
 
@@ -189,7 +189,7 @@ async function runEditorFlow(page, shoot) {
   await clickButton(page, "Map");
   const counts = await difficultyCounts(page);
   console.log(`auto-map counts ${JSON.stringify(counts)}`);
-  const increasing = counts.Easy > 0 && counts.Easy < counts.Normal && counts.Normal < counts.Hard && counts.Hard < counts.Expert;
+  const increasing = counts.Easy > 0 && counts.Easy < counts.Normal && counts.Normal < counts.Hard && counts.Hard < counts.Expert && counts.Expert < counts["Expert+"];
   if (!increasing) throw new Error(`auto-map counts are not increasing: ${JSON.stringify(counts)}`);
   await shoot("04-map");
   const timeline = await page.waitForSelector('[data-testid="timeline"]');

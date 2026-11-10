@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { measureGridDriftMs } from "../audio/beatGrid";
 import { IMPORT_ACCEPT } from "../audio/decode";
-import { DIFFICULTIES, type Project, type SongInfo } from "../core/model";
+import { DIFFICULTIES, difficultyLabel, type Project, type SongInfo } from "../core/model";
 import { beatToSeconds, validateBpm } from "../core/timing";
 import type { ProjectStore } from "../storage/projectStore";
 import { DRIFT_WARNING_MS } from "../validation/validate";
@@ -177,7 +177,7 @@ export function SongPanel({ project, store, session, busy, onImport, onChange }:
             <h3>Note speed</h3>
             <div className="field-grid">
               {DIFFICULTIES.map((difficulty) => (
-                <NumberField key={difficulty} label={`${difficulty} jump speed`} value={project.settings[difficulty].noteJumpSpeed} step={0.5}
+                <NumberField key={difficulty} label={`${difficultyLabel(difficulty)} jump speed`} value={project.settings[difficulty].noteJumpSpeed} step={0.5}
                   onCommit={(noteJumpSpeed) => onChange((current) => ({ ...current, settings: { ...current.settings, [difficulty]: { ...current.settings[difficulty], noteJumpSpeed } } }))} />
               ))}
             </div>

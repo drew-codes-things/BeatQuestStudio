@@ -1,5 +1,11 @@
-export const DIFFICULTIES = ["Easy", "Normal", "Hard", "Expert"] as const;
+export const DIFFICULTIES = ["Easy", "Normal", "Hard", "Expert", "ExpertPlus"] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
+
+const DIFFICULTY_LABELS: Record<Difficulty, string> = { Easy: "Easy", Normal: "Normal", Hard: "Hard", Expert: "Expert", ExpertPlus: "Expert+" };
+
+export function difficultyLabel(difficulty: Difficulty): string {
+  return DIFFICULTY_LABELS[difficulty];
+}
 
 export const GRID_COLUMNS = 4;
 export const GRID_ROWS = 3;
@@ -108,6 +114,7 @@ export const DEFAULT_SETTINGS: Record<Difficulty, DifficultySettings> = {
   Normal: { noteJumpSpeed: 12, noteJumpOffset: 0 },
   Hard: { noteJumpSpeed: 14, noteJumpOffset: 0 },
   Expert: { noteJumpSpeed: 16, noteJumpOffset: 0 },
+  ExpertPlus: { noteJumpSpeed: 18, noteJumpOffset: 0 },
 };
 
 export function emptyChart(): Chart {
@@ -115,7 +122,19 @@ export function emptyChart(): Chart {
 }
 
 export function emptyCharts(): Record<Difficulty, Chart> {
-  return { Easy: emptyChart(), Normal: emptyChart(), Hard: emptyChart(), Expert: emptyChart() };
+  return Object.fromEntries(DIFFICULTIES.map((difficulty) => [difficulty, emptyChart()])) as Record<Difficulty, Chart>;
+}
+
+export function withEveryDifficulty(project: Project): Project {
+  const missing = DIFFICULTIES.filter((difficulty) => !project.charts[difficulty] || !project.settings[difficulty]);
+  if (missing.length === 0) return project;
+  const charts = { ...project.charts };
+  const settings = { ...project.settings };
+  for (const difficulty of missing) {
+    charts[difficulty] ??= emptyChart();
+    settings[difficulty] ??= { ...DEFAULT_SETTINGS[difficulty] };
+  }
+  return { ...project, charts, settings };
 }
 
 export function newProject(id: string, name: string, now: number): Project {

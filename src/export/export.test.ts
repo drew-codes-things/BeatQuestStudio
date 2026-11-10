@@ -1,6 +1,6 @@
 import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { newProject, type Project } from "../core/model";
+import { difficultyLabel, newProject, type Project } from "../core/model";
 import { isOggVorbis, encodeOggVorbis } from "./audio";
 import { buildDifficulty, buildInfo, exportBeat, mapFolderName } from "./beatmap";
 import { buildMapFiles, coverFileNameFor, zipMapFiles } from "./package";
@@ -54,6 +54,16 @@ describe("Info.dat", () => {
     expect(sets.map((set) => set._beatmapCharacteristicName)).toEqual(["Standard"]);
     expect(sets[0]!._difficultyBeatmaps.map((entry) => [entry._difficulty, entry._difficultyRank, entry._beatmapFilename, entry._noteJumpMovementSpeed]))
       .toEqual([["Easy", 1, "EasyStandard.dat", 10], ["Expert", 7, "ExpertStandard.dat", 16]]);
+  });
+
+  it("exports Expert+ as Beat Saber's ExpertPlus, ranked above Expert", () => {
+    const withExpertPlus = project();
+    withExpertPlus.charts.ExpertPlus.notes.push({ id: "e", beat: 4, x: 2, y: 0, color: "blue", direction: "down" });
+    const sets = buildInfo(withExpertPlus, "cover.png")._difficultyBeatmapSets as { _difficultyBeatmaps: Record<string, unknown>[] }[];
+    expect(sets[0]!._difficultyBeatmaps.at(-1)).toMatchObject({ _difficulty: "ExpertPlus", _difficultyRank: 9, _beatmapFilename: "ExpertPlusStandard.dat", _noteJumpMovementSpeed: 18 });
+    expect(Object.keys(buildMapFiles(withExpertPlus, new Uint8Array([1]), { fileName: "cover.png", bytes: new Uint8Array([2]) }))).toContain("ExpertPlusStandard.dat");
+    expect(difficultyLabel("ExpertPlus")).toBe("Expert+");
+    expect(difficultyLabel("Hard")).toBe("Hard");
   });
 
   it("refuses to build without a song", () => {

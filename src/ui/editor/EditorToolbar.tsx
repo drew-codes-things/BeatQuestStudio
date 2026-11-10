@@ -1,4 +1,4 @@
-import { type CutDirection, DIFFICULTIES, type Difficulty } from "../../core/model";
+import { type CutDirection, DIFFICULTIES, type Difficulty, difficultyLabel } from "../../core/model";
 import { SNAP_DIVISIONS } from "./geometry";
 import type { PlacementSettings, Tool, WallShape } from "./placement";
 
@@ -98,7 +98,7 @@ export function EditorToolbar(props: EditorToolbarProps) {
           onChange={(event) => event.target.value && props.onCopyToDifficulty(event.target.value as Difficulty)}
         >
           <option value="">Copy to...</option>
-          {DIFFICULTIES.filter((difficulty) => difficulty !== props.difficulty).map((difficulty) => <option key={difficulty} value={difficulty}>{difficulty}</option>)}
+          {DIFFICULTIES.filter((difficulty) => difficulty !== props.difficulty).map((difficulty) => <option key={difficulty} value={difficulty}>{difficultyLabel(difficulty)}</option>)}
         </select>
         <button onClick={props.onShowPreview}>{props.previewShown ? "Hide 3D" : "Show 3D"}</button>
       </div>

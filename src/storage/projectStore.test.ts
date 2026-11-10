@@ -1,6 +1,6 @@
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { newProject } from "../core/model";
+import { DEFAULT_SETTINGS, emptyChart, newProject, type Project } from "../core/model";
 import { MAX_BACKUPS_PER_PROJECT, ProjectStore } from "./projectStore";
 
 let store: ProjectStore;
@@ -88,6 +88,19 @@ describe("ProjectStore", () => {
     expect((await upgraded.loadProject("old"))?.name).toBe("From v1");
     expect(await upgraded.loadCover("old")).toBeNull();
     upgraded.close();
+  });
+
+  it("gives projects saved before Expert+ existed an empty Expert+ to work on", async () => {
+    const old = newProject("pre", "Before Expert+", 1) as unknown as { charts: Record<string, unknown>; settings: Record<string, unknown> };
+    delete old.charts.ExpertPlus;
+    delete old.settings.ExpertPlus;
+    await store.saveProject(old as unknown as Project);
+    await store.createBackup(old as unknown as Project, "old", 2);
+    expect((await store.listProjects()).find((summary) => summary.id === "pre")?.noteCount).toBe(0);
+    const loaded = await store.loadProject("pre");
+    expect(loaded?.charts.ExpertPlus).toEqual(emptyChart());
+    expect(loaded?.settings.ExpertPlus).toEqual(DEFAULT_SETTINGS.ExpertPlus);
+    expect((await store.listBackups("pre"))[0]?.project.charts.ExpertPlus).toEqual(emptyChart());
   });
 
   it("refuses to duplicate a project that does not exist", async () => {

@@ -92,7 +92,7 @@ export function BatchPanel({ batch }: { batch: BatchMaker }) {
       <h3>Make maps from your songs</h3>
       <div className="dropzone">
         <p className="dropzone-title">{dragging ? "Let go to add them" : "Drop songs or a whole folder anywhere on this page"}</p>
-        <p className="meta">MP3, WAV, OGG, FLAC, M4A or video. Each song gets Easy, Normal, Hard and Expert, and songs you already made are skipped.</p>
+        <p className="meta">MP3, WAV, OGG, FLAC, M4A or video. Each song gets Easy, Normal, Hard, Expert and Expert+, and songs you already made are skipped.</p>
         <div className="toolbar wrap center">
           <label className="file-button">
             Add songs

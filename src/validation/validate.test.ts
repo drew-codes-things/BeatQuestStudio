@@ -27,7 +27,7 @@ describe("project checks", () => {
     const project = projectWithSong();
     project.charts.Expert.notes.push(note("a", 4, 1, 0, "red"));
     const issues = validateProject(project);
-    expect(issues.filter((found) => found.code === "empty").map((found) => found.difficulty)).toEqual(["Easy", "Normal", "Hard"]);
+    expect(issues.filter((found) => found.code === "empty").map((found) => found.difficulty)).toEqual(["Easy", "Normal", "Hard", "ExpertPlus"]);
     expect(hasErrors(issues)).toBe(false);
   });
 

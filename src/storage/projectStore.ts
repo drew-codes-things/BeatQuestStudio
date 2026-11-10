@@ -1,4 +1,4 @@
-import { DIFFICULTIES, type Project } from "../core/model";
+import { DIFFICULTIES, type Project, withEveryDifficulty } from "../core/model";
 
 const DATABASE_NAME = "beatmap-studio";
 const DATABASE_VERSION = 2;
@@ -99,13 +99,13 @@ export class ProjectStore {
   async listProjects(): Promise<ProjectSummary[]> {
     const store = this.database.transaction(PROJECTS, "readonly").objectStore(PROJECTS);
     const projects = await requestToPromise(store.getAll() as IDBRequest<Project[]>, "listing projects");
-    return projects.map(summarizeProject).sort((left, right) => right.updatedAt - left.updatedAt);
+    return projects.map((project) => summarizeProject(withEveryDifficulty(project))).sort((left, right) => right.updatedAt - left.updatedAt);
   }
 
   async loadProject(id: string): Promise<Project | null> {
     const store = this.database.transaction(PROJECTS, "readonly").objectStore(PROJECTS);
     const project = await requestToPromise(store.get(id) as IDBRequest<Project | undefined>, `loading project ${id}`);
-    return project ?? null;
+    return project ? withEveryDifficulty(project) : null;
   }
 
   async saveProject(project: Project): Promise<void> {
@@ -183,6 +183,6 @@ export class ProjectStore {
   async listBackups(projectId: string): Promise<Backup[]> {
     const index = this.database.transaction(BACKUPS, "readonly").objectStore(BACKUPS).index(BACKUPS_BY_PROJECT);
     const backups = await requestToPromise(index.getAll(projectId) as IDBRequest<Backup[]>, `listing backups of ${projectId}`);
-    return backups.sort((left, right) => right.takenAt - left.takenAt);
+    return backups.map((backup) => ({ ...backup, project: withEveryDifficulty(backup.project) })).sort((left, right) => right.takenAt - left.takenAt);
   }
 }

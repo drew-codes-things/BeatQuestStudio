@@ -11,6 +11,7 @@ const SAMPLE_RATE = 22050;
 const BPM = 120;
 const OFFSET = 0.25;
 const DURATION = 90;
+const OWN_SIDE_AT_LEAST: Record<Difficulty, number> = { Easy: 0.85, Normal: 0.85, Hard: 0.85, Expert: 0.85, ExpertPlus: 0.75 };
 
 function counter() {
   let next = 0;
@@ -56,7 +57,7 @@ describe("generateChart", () => {
   it.each(DIFFICULTIES)("keeps each hand mostly on its own side in %s", (difficulty) => {
     const notes = charts[difficulty].notes;
     const onOwnSide = notes.filter((note) => (note.color === "red" ? note.x <= 1 : note.x >= 2)).length;
-    expect(onOwnSide / notes.length).toBeGreaterThan(0.85);
+    expect(onOwnSide / notes.length).toBeGreaterThan(OWN_SIDE_AT_LEAST[difficulty]);
   });
 
   it.each(DIFFICULTIES)("alternates forehand and backhand like a human map in %s", (difficulty) => {

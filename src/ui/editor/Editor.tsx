@@ -15,7 +15,7 @@ import {
   removeObjects,
   setDirection,
 } from "../../core/edit";
-import { type Chart, type CutDirection, chartObjectCount, DIFFICULTIES, type Difficulty, type Project } from "../../core/model";
+import { type Chart, type CutDirection, chartObjectCount, DIFFICULTIES, type Difficulty, difficultyLabel, type Project } from "../../core/model";
 import { beatToSeconds, secondsToBeat, snapBeat } from "../../core/timing";
 import type { SongSession } from "../session";
 import { EditorToolbar } from "./EditorToolbar";
@@ -287,7 +287,7 @@ export function Editor(props: EditorProps) {
       <div className="difficulty-tabs" role="tablist">
         {DIFFICULTIES.map((option) => (
           <button key={option} role="tab" aria-selected={option === difficulty} className={option === difficulty ? "tab active" : "tab"} onClick={() => props.onDifficulty(option)}>
-            {option} <span className="count">{chartObjectCount(project.charts[option])}</span>
+            {difficultyLabel(option)} <span className="count">{chartObjectCount(project.charts[option])}</span>
           </button>
         ))}
       </div>

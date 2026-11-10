@@ -2,7 +2,7 @@
 
 # BeatQuest Studio
 
-**A Beat Saber map maker that runs in Chrome. Drop in a song or a video, get a beat grid that lands on the music, draft Easy, Normal, Hard and Expert automatically, edit every note, and send the map to a modded Quest.**
+**A Beat Saber map maker that runs in Chrome. Drop in a song or a video, get a beat grid that lands on the music, draft Easy, Normal, Hard, Expert and Expert+ automatically, edit every note, and send the map to a modded Quest.**
 
 [![TypeScript](https://img.shields.io/badge/typescript-drew?style=flat-square&logo=typescript&logoColor=white&color=3178C6)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/react-drew?style=flat-square&logo=react&logoColor=white&color=149ECA)](https://react.dev/)
@@ -28,9 +28,9 @@ and nothing is uploaded anywhere.
   attack of every beat, not guessed from loudness, and the Song tab tells you
   how closely the grid fits ("the beats land within 0.9 ms of the music in 90%
   of the song"). Songs that change tempo are flagged.
-- **Four real difficulties.** Easy, Normal, Hard and Expert are each drafted on
-  their own from the song, never made by deleting notes from Expert. Hard and
-  Expert switch to triplets in bars where the music does.
+- **Five real difficulties.** Easy, Normal, Hard, Expert and Expert+ are each
+  drafted on their own from the song, never made by deleting notes from a harder
+  one. Hard and up switch to triplets in bars where the music does.
 - **Moves like a human map.** Where each note goes is learned from 43 curated
   and ranked community maps: forehand and backhand always alternate,
   downswings sit low and upswings start higher, angles and two-handed hits
@@ -77,7 +77,7 @@ server (see [Hosting](#hosting)). Or run it from source:
 
 ## Making a map
 
-![The map editor: four difficulty tabs, the lane timeline over the waveform, the cell grid and the 3D preview](screenshot-editor.png)
+![The map editor: the difficulty tabs, the lane timeline over the waveform, the cell grid and the 3D preview](screenshot-editor.png)
 
 1. **New project**, then on the **Song** tab choose a song or video.
 2. Check the **Beat grid**. "Play with beat clicks" plays the song with a tick
@@ -95,7 +95,7 @@ server (see [Hosting](#hosting)). Or run it from source:
 
 On the **Make maps** tab, drop songs or a whole folder anywhere on the page, or
 use **Add songs** or **Add a folder**. Each file becomes a project named after
-it, with all four difficulties drafted. The batch starts by itself, and the
+it, with all five difficulties drafted. The batch starts by itself, and the
 **Song by song** list opens on its own when something needs a look.
 
 Before a song is mapped its title, artist and length are compared with the
@@ -192,20 +192,20 @@ pages. WebUSB and folder saving need Chrome or Edge on a desktop computer.
 maps and compares the result with the human map for the same song. On 41
 curated and ranked maps (medians, human / auto):
 
-| | Easy | Normal | Hard | Expert |
-|---|---|---|---|---|
-| Notes per second | 1.67 / 1.66 | 2.27 / 2.39 | 3.22 / 3.31 | 3.96 / 4.41 |
-| Forehand/backhand alternation | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
-| Downswings on the bottom row | 0.99 / 0.99 | 0.99 / 0.99 | 0.94 / 0.95 | 0.91 / 0.92 |
-| Upswings above the bottom row | 0.82 / 0.81 | 0.86 / 0.83 | 0.89 / 0.85 | 0.92 / 0.90 |
-| Two-handed hits | 0.07 / 0.07 | 0.11 / 0.13 | 0.12 / 0.12 | 0.15 / 0.20 |
+| | Easy | Normal | Hard | Expert | Expert+ |
+|---|---|---|---|---|---|
+| Notes per second | 1.67 / 1.66 | 2.27 / 2.39 | 3.22 / 3.31 | 3.96 / 4.01 | 5.23 / 5.32 |
+| Forehand/backhand alternation | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| Downswings on the bottom row | 0.99 / 0.99 | 0.99 / 0.99 | 0.94 / 0.95 | 0.91 / 0.91 | 0.81 / 0.81 |
+| Upswings above the bottom row | 0.82 / 0.81 | 0.86 / 0.83 | 0.89 / 0.85 | 0.92 / 0.89 | 0.91 / 0.92 |
+| Two-handed hits | 0.07 / 0.07 | 0.11 / 0.13 | 0.12 / 0.12 | 0.15 / 0.16 | 0.21 / 0.22 |
 
 Rhythm is the biggest remaining difference: the share of human notes that the
-auto-map also hits within 50 ms is 0.32 on Easy, 0.39 on Normal, 0.51 on Hard
-and 0.60 on Expert (it was 0.22, 0.31, 0.47 and 0.59 before the beat was
-taken from the kick drum). On 11 maps held back from learning, alternation
-stays at 1.00 for every difficulty and Hard and Expert density lands within 5%
-of the human map.
+auto-map also hits within 50 ms is 0.32 on Easy, 0.39 on Normal, 0.51 on Hard,
+0.59 on Expert and 0.68 on Expert+ (Easy to Expert were 0.22, 0.31, 0.47 and
+0.59 before the beat was taken from the kick drum). On 11 maps held back from
+learning, alternation stays at 1.00 for every difficulty and Hard, Expert and
+Expert+ density lands within 6% of the human map.
 `scripts/learn-flow.ts` rebuilds `src/generator/flowTable.json` from a folder
 of maps; only counts of moves are kept, never the maps themselves.
 

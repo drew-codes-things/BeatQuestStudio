@@ -12,7 +12,7 @@ const BEAT_PRECISION = 10000;
 const DEFAULT_SHUFFLE_PERIOD = 0.5;
 const BEATS_PER_BAR = 4;
 
-export const DIFFICULTY_RANKS: Record<Difficulty, number> = { Easy: 1, Normal: 3, Hard: 5, Expert: 7 };
+export const DIFFICULTY_RANKS: Record<Difficulty, number> = { Easy: 1, Normal: 3, Hard: 5, Expert: 7, ExpertPlus: 9 };
 
 const CUT_DIRECTION_CODES: Record<CutDirection, number> = {
   up: 0,

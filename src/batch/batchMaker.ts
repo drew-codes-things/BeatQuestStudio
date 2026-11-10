@@ -1,5 +1,5 @@
 import { AudioWorkerClient } from "../audio/workerProtocol";
-import { DIFFICULTIES, newProject, type Project } from "../core/model";
+import { DIFFICULTIES, difficultyLabel, newProject, type Project } from "../core/model";
 import { FIXED_MAP_SEED, generateCharts } from "../generator/generate";
 import { readSongDurationSeconds, readSongTags, songIdentity } from "../import/songIdentity";
 import { type ReadSong, readSongFile, storeAutoCover, withImportedSong } from "../import/songImport";
@@ -104,7 +104,7 @@ export class BatchMaker {
     const made = { ...project, charts: { ...project.charts, ...charts } };
     await this.saveProjectWithAudio(made, read);
     (await this.knownProjects()).push(summarizeProject(made));
-    const counts = DIFFICULTIES.map((difficulty) => `${difficulty} ${charts[difficulty]?.notes.length ?? 0}`).join(", ");
+    const counts = DIFFICULTIES.map((difficulty) => `${difficultyLabel(difficulty)} ${charts[difficulty]?.notes.length ?? 0}`).join(", ");
     const named = read.identity.artist ? `${read.identity.artist} - ${title}` : title;
     return { message: `${named}, ${Math.round(project.timing.bpm * 100) / 100} BPM${read.strippedFromVideo ? ", sound taken from the video" : ""}: ${counts} notes`, projectId: project.id };
   }

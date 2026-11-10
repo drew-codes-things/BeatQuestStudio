@@ -4,6 +4,7 @@ import {
   chartObjectCount,
   type CutDirection,
   DIFFICULTIES,
+  difficultyLabel,
   type Difficulty,
   type DifficultySettings,
   GRID_COLUMNS,
@@ -165,7 +166,7 @@ function checkHandFlow(notes: readonly Note[], difficulty: Difficulty): Issue[] 
         issues.push(issue("parity", "warning", difficulty, current.beat, `${color === "red" ? "Red" : "Blue"} hand swings ${currentSwing} twice in a row at beat ${formatBeat(current.beat)} without time to reset.`, [previous.id, current.id]));
       }
       if (gap < profile.minSameHandGapBeats * FAST_GAP_FACTOR) {
-        issues.push(issue("too-fast", "warning", difficulty, current.beat, `${color === "red" ? "Red" : "Blue"} notes ${formatBeat(gap)} beats apart at beat ${formatBeat(current.beat)} are very fast for ${difficulty}.`, [previous.id, current.id]));
+        issues.push(issue("too-fast", "warning", difficulty, current.beat, `${color === "red" ? "Red" : "Blue"} notes ${formatBeat(gap)} beats apart at beat ${formatBeat(current.beat)} are very fast for ${difficultyLabel(difficulty)}.`, [previous.id, current.id]));
       }
     }
   }
@@ -186,7 +187,7 @@ function checkSliders(chart: Chart, difficulty: Difficulty): Issue[] {
 
 function checkSettings(settings: DifficultySettings, difficulty: Difficulty): Issue[] {
   if (settings.noteJumpSpeed >= MIN_NOTE_JUMP_SPEED && settings.noteJumpSpeed <= MAX_NOTE_JUMP_SPEED) return [];
-  return [issue("note-jump-speed", "warning", difficulty, null, `${difficulty} note jump speed ${settings.noteJumpSpeed} is outside ${MIN_NOTE_JUMP_SPEED} to ${MAX_NOTE_JUMP_SPEED}.`)];
+  return [issue("note-jump-speed", "warning", difficulty, null, `${difficultyLabel(difficulty)} note jump speed ${settings.noteJumpSpeed} is outside ${MIN_NOTE_JUMP_SPEED} to ${MAX_NOTE_JUMP_SPEED}.`)];
 }
 
 export function validateChart(project: Project, difficulty: Difficulty): Issue[] {
@@ -234,7 +235,7 @@ function checkProject(project: Project): Issue[] {
   if (bpmProblem) issues.push(issue("bpm", "error", null, null, bpmProblem));
   const empty = DIFFICULTIES.filter((difficulty) => chartObjectCount(project.charts[difficulty]) === 0);
   if (empty.length === DIFFICULTIES.length) issues.push(issue("all-empty", "error", null, null, "Every difficulty is empty."));
-  else for (const difficulty of empty) issues.push(issue("empty", "warning", difficulty, null, `${difficulty} is empty and will be left out of the export.`));
+  else for (const difficulty of empty) issues.push(issue("empty", "warning", difficulty, null, `${difficultyLabel(difficulty)} is empty and will be left out of the export.`));
   return issues;
 }
 

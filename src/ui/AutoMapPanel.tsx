@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type Chart, chartObjectCount, DIFFICULTIES, type Difficulty, type Project } from "../core/model";
+import { type Chart, chartObjectCount, DIFFICULTIES, type Difficulty, difficultyLabel, type Project } from "../core/model";
 import { FIXED_MAP_SEED, generateCharts } from "../generator/generate";
 import type { ProjectStore } from "../storage/projectStore";
 import { errorMessage } from "./format";
@@ -32,7 +32,7 @@ export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPa
       await store.createBackup(project, "before auto-map", Date.now());
       const charts = generateCharts(project.timing, session.analysis, DIFFICULTIES.filter((difficulty) => chosen.has(difficulty)), FIXED_MAP_SEED, () => crypto.randomUUID());
       onGenerated(charts);
-      const summary = Object.entries(charts).map(([difficulty, chart]) => `${difficulty} ${chart.notes.length}`).join(", ");
+      const summary = Object.entries(charts).map(([difficulty, chart]) => `${difficultyLabel(difficulty as Difficulty)} ${chart.notes.length}`).join(", ");
       setStatus(`Drafted ${summary} notes. A backup of the previous version was saved.`);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -63,7 +63,7 @@ export function AutoMapPanel({ project, store, session, onGenerated }: AutoMapPa
         <div className="toolbar">
           {DIFFICULTIES.map((difficulty) => (
             <label key={difficulty} className="check">
-              <input type="checkbox" checked={chosen.has(difficulty)} onChange={() => toggle(difficulty)} /> {difficulty}
+              <input type="checkbox" checked={chosen.has(difficulty)} onChange={() => toggle(difficulty)} /> {difficultyLabel(difficulty)}
               <span className="meta"> ({chartObjectCount(project.charts[difficulty])} now)</span>
             </label>
           ))}
