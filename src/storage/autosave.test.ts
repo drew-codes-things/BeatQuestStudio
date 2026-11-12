@@ -38,6 +38,39 @@ describe("createAutosaver", () => {
     expect(reported?.message).toBe("disk full");
   });
 
+  it("keeps the unsaved value after a failure so the next flush saves it", async () => {
+    const saved: number[] = [];
+    const states: SaveState[] = [];
+    let storageWorks = false;
+    const autosaver = createAutosaver(async (value: number) => {
+      if (!storageWorks) throw new Error("storage busy");
+      saved.push(value);
+    }, 10, (state) => states.push(state));
+    autosaver.schedule(7);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(states.at(-1)).toBe("failed");
+    storageWorks = true;
+    await autosaver.flush();
+    expect(saved).toEqual([7]);
+    expect(states.at(-1)).toBe("saved");
+  });
+
+  it("saves the newer value when an edit arrives during a failing save", async () => {
+    const saved: number[] = [];
+    let attempts = 0;
+    const autosaver = createAutosaver(async (value: number) => {
+      attempts += 1;
+      if (attempts === 1) {
+        autosaver.schedule(2);
+        throw new Error("storage busy");
+      }
+      saved.push(value);
+    }, 10, () => {});
+    autosaver.schedule(1);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(saved).toEqual([2]);
+  });
+
   it("drops a pending save when cancelled", async () => {
     const saved: number[] = [];
     const autosaver = createAutosaver(async (value: number) => void saved.push(value), 10, () => {});

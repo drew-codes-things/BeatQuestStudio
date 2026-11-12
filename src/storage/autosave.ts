@@ -30,6 +30,7 @@ export function createAutosaver<T>(
       await save(value);
       onStateChange(pendingValue ? "pending" : "saved");
     } catch (cause) {
+      pendingValue ??= { value };
       const error = cause instanceof Error ? cause : new Error(String(cause));
       onStateChange("failed", error);
     }
