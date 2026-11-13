@@ -1011,3 +1011,20 @@ details[open] > summary {
     transition-duration: .001ms !important;
   }
 }
+
+@media (max-width: 820px), (pointer: coarse) {
+  input[type="text"],
+  select {
+    font-size: 16px;
+  }
+
+  button,
+  input[type="text"],
+  select {
+    min-height: 44px;
+  }
+
+  details summary {
+    padding: 14px 0;
+  }
+}
