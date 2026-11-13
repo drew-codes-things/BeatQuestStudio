@@ -72,7 +72,7 @@ and nothing is uploaded anywhere.
 
 ## Download
 
-Get `BeatQuestStudio-1.2.0.zip` from the [latest release](../../releases/latest).
+Get `BeatQuestStudio-1.3.0.zip` from the [latest release](../../releases/latest).
 It is the built site: unzip it and serve the folder with any static web
 server (see [Hosting](#hosting)). Or run it from source:
 
