@@ -5,7 +5,7 @@ import { importRejection, songLengthRejection } from "../batch/limits";
 import { DEFAULT_PROJECT_NAME, type Project } from "../core/model";
 import { AUTO_COVER_FILE_NAME, makeAutoCover } from "../export/cover";
 import type { ProjectStore, StoredAudio } from "../storage/projectStore";
-import { readSongTags, type SongIdentity, songIdentity, type SongTags } from "./songIdentity";
+import { readSongDurationSeconds, readSongTags, type SongIdentity, songIdentity, type SongTags } from "./songIdentity";
 
 const DEFAULT_PREVIEW_SECONDS = 10;
 const PREVIEW_POSITION = 0.4;
@@ -37,8 +37,13 @@ export async function decodeAndAnalyse(context: BaseAudioContext, bytes: ArrayBu
   return { buffer, analysis, peaks };
 }
 
+async function lengthRejectionBeforeDecoding(file: File): Promise<string | null> {
+  const declaredSeconds = await readSongDurationSeconds(file);
+  return declaredSeconds === null ? null : songLengthRejection(file.name, declaredSeconds);
+}
+
 export async function readSongFile(file: File, context: BaseAudioContext, worker: AudioWorkerClient): Promise<ReadSong> {
-  const rejection = importRejection(file);
+  const rejection = importRejection(file) ?? (await lengthRejectionBeforeDecoding(file));
   if (rejection) throw new Error(rejection);
   const tags = await readSongTags(file);
   const identity = songIdentity(tags, file.name);

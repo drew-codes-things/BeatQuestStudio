@@ -122,7 +122,7 @@ So a big batch cannot bring the browser down, it works within these limits:
 | Songs in a batch | No limit | Files are only read when their turn comes |
 | Songs at once | 1 | Each song is decoded, analysed and saved before the next starts |
 | File size | 256 MB | Larger files are skipped before they are read |
-| Song length | 15 minutes | Longer songs are skipped after decoding |
+| Song length | 15 minutes | Longer songs are skipped before decoding when the file states its length, and after decoding otherwise |
 | Time per song | 3 minutes | A stuck song is stopped and the batch moves on |
 | Browser storage | 100 MB spare | The batch pauses and says so; press Start to carry on |
 | Zip size | 256 MB per part | Bigger exports are split into several zips |
