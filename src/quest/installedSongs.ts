@@ -1,5 +1,5 @@
 import { escapeArg, LinuxFileType } from "@yume-chan/adb";
-import { CUSTOM_LEVELS_PATH, listCustomLevelsIfPresent, type QuestConnection } from "./usb";
+import { CUSTOM_LEVELS_PATH, listCustomLevels, type QuestConnection } from "./usb";
 
 const INFO_FILE_NAME = "info.dat";
 const MAX_INFO_BYTES = 1024 * 1024;
@@ -171,7 +171,7 @@ function assertSafeFolderName(folder: string): void {
 export async function deleteInstalledSong(connection: QuestConnection, folder: string): Promise<void> {
   assertSafeFolderName(folder);
   await connection.adb.subprocess.noneProtocol.spawnWaitText(["rm", "-r", escapeArg(`${CUSTOM_LEVELS_PATH}/${folder}`)]);
-  if ((await listCustomLevelsIfPresent(connection)).includes(folder)) throw new Error(`"${folder}" is still on the headset after deleting it`);
+  if ((await listCustomLevels(connection)).includes(folder)) throw new Error(`"${folder}" is still on the headset after deleting it`);
 }
 
 export function matchStudioProject<T extends { id: string }>(folder: string, projects: readonly T[]): T | null {

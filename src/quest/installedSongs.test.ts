@@ -165,6 +165,16 @@ describe("deleteInstalledSong", () => {
     expect(headset.present.size).toBe(0);
   });
 
+  it("does not report a removal it could not confirm", async () => {
+    const headset = fakeHeadset(folders);
+    headset.connection.adb.subprocess.noneProtocol.spawnWaitText = async () => "rm: Permission denied";
+    headset.connection.adb.sync = async () => ({
+      readdir: async () => { throw new Error("transport closed"); },
+      dispose: async () => {},
+    }) as never;
+    await expect(deleteInstalledSong(headset.connection, "aaaaaa (Night Drive - Some Mapper)")).rejects.toThrow(/transport closed/);
+  });
+
   it("says so when the folder is still there afterwards", async () => {
     const headset = fakeHeadset(folders);
     headset.connection.adb.subprocess.noneProtocol.spawnWaitText = async () => "";
