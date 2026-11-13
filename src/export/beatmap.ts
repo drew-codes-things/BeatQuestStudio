@@ -174,14 +174,34 @@ export function buildInfo(project: Project, coverFileName: string): Record<strin
 
 const UNSAFE_FOLDER_CHARACTERS = /[^\p{L}\p{N} ()._,&+!-]/gu;
 const MAX_FOLDER_PART_LENGTH = 60;
+const MAX_FOLDER_NAME_BYTES = 255;
+const ENDS_WITH_HIGH_SURROGATE = /[\uD800-\uDBFF]$/;
+
+function cutWithoutSplittingCharacters(text: string, maxLength: number): string {
+  const cut = text.slice(0, maxLength);
+  return ENDS_WITH_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+}
 
 function safePart(text: string, fallback: string): string {
-  const cleaned = text.replace(UNSAFE_FOLDER_CHARACTERS, "").replace(/\s+/g, " ").trim().slice(0, MAX_FOLDER_PART_LENGTH).replace(/[. ]+$/, "");
-  return cleaned || fallback;
+  const cleaned = text.replace(UNSAFE_FOLDER_CHARACTERS, "").replace(/\s+/g, " ").trim();
+  return cutWithoutSplittingCharacters(cleaned, MAX_FOLDER_PART_LENGTH).replace(/[. ]+$/, "") || fallback;
+}
+
+function utf8Length(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+function withoutLastCharacter(text: string): string {
+  return Array.from(text).slice(0, -1).join("");
 }
 
 export function mapFolderName(project: Project): string {
-  const title = safePart(project.song?.title || project.name, "Untitled");
-  const mapper = safePart(project.song?.mapper ?? "", "Unknown");
-  return `${project.id.slice(0, 6)} (${title} - ${mapper})`;
+  const prefix = project.id.slice(0, 6);
+  let title = safePart(project.song?.title || project.name, "Untitled");
+  let mapper = safePart(project.song?.mapper ?? "", "Unknown");
+  while (utf8Length(`${prefix} (${title} - ${mapper})`) > MAX_FOLDER_NAME_BYTES) {
+    if (utf8Length(title) >= utf8Length(mapper)) title = withoutLastCharacter(title);
+    else mapper = withoutLastCharacter(mapper);
+  }
+  return `${prefix} (${title} - ${mapper})`;
 }

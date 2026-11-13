@@ -108,6 +108,23 @@ describe("folder and zip", () => {
     expect(mapFolderName(tricky)).toBe("abcdef (Its (rm -rf) x Ünïcode - Drew)");
   });
 
+  it("keeps the folder name within the 255 byte file name limit", () => {
+    const wide = project();
+    wide.song!.title = "東".repeat(60);
+    wide.song!.mapper = "京".repeat(30);
+    const name = mapFolderName(wide);
+    expect(new TextEncoder().encode(name).length).toBeLessThanOrEqual(255);
+    expect(name.startsWith("abcdef (東")).toBe(true);
+    expect(name.endsWith("京)")).toBe(true);
+  });
+
+  it("never cuts a character outside the basic plane in half", () => {
+    const astral = project();
+    astral.song!.title = `a${"𝒜".repeat(40)}`;
+    const name = mapFolderName(astral);
+    expect(new TextDecoder().decode(new TextEncoder().encode(name))).toBe(name);
+  });
+
   it("picks the cover file name from the upload", () => {
     expect(coverFileNameFor("Art.JPEG")).toBe("cover.jpg");
     expect(coverFileNameFor("art.webp")).toBe("cover.png");
