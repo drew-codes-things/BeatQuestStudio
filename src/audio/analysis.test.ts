@@ -88,6 +88,29 @@ describe("tempo and offset", () => {
   });
 });
 
+describe("samples that are not numbers", () => {
+  it("treats NaN and Infinity as silence so the offset stays a number", () => {
+    const samples = makeClickTrack({ bpm: 128, offsetSeconds: 0.3, durationSeconds: 20, sampleRate: SAMPLE_RATE, accentEvery: 4, noiseLevel: 0.02 });
+    samples.fill(Number.NaN, 0, SAMPLE_RATE);
+    samples.fill(Number.POSITIVE_INFINITY, SAMPLE_RATE * 2, SAMPLE_RATE * 2 + 100);
+    for (const channels of [[samples], [samples, samples.slice()]]) {
+      const analysis = analyseSong(channels, SAMPLE_RATE);
+      expect(Number.isFinite(analysis.tempo.offsetSeconds)).toBe(true);
+      expect(Number.isFinite(analysis.tempo.bpm)).toBe(true);
+    }
+  });
+
+  it("gives a finite offset for a file that is all NaN", () => {
+    const analysis = analyseSong([new Float32Array(SAMPLE_RATE * 5).fill(Number.NaN)], SAMPLE_RATE);
+    expect(Number.isFinite(analysis.tempo.offsetSeconds)).toBe(true);
+  });
+
+  it("does not copy samples that are already all finite", () => {
+    const samples = new Float32Array([0.1, -0.2, 0.3]);
+    expect(mixToMono([samples])).toBe(samples);
+  });
+});
+
 describe("waveform and energy", () => {
   it("averages channels to mono", () => {
     const mono = mixToMono([new Float32Array([1, 0, -1]), new Float32Array([0, 0, 1])]);

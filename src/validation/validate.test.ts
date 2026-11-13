@@ -39,6 +39,15 @@ describe("project checks", () => {
     expect(validateProject(project).find((found) => found.code === "beat-drift")?.message).toMatch(/40 ms/);
   });
 
+  it("blocks export when the beat offset is not a finite number", () => {
+    const project = projectWithSong();
+    project.charts.Expert.notes.push(note("a", 4, 1, 0, "red"));
+    project.timing.offsetSeconds = Number.NaN;
+    const issues = validateProject(project);
+    expect(issues.find((found) => found.code === "offset")?.severity).toBe("error");
+    expect(hasErrors(issues)).toBe(true);
+  });
+
   it("warns when an easier difficulty has more notes", () => {
     const project = projectWithSong();
     project.charts.Easy.notes.push(note("a", 4, 1, 0, "red"), note("b", 8, 2, 0, "blue"));

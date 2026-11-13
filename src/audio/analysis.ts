@@ -52,13 +52,21 @@ export interface SongAnalysis {
   energy: Float32Array;
 }
 
+function finiteOrSilent(sample: number): number {
+  return Number.isFinite(sample) ? sample : 0;
+}
+
+function hasOnlyFiniteSamples(samples: Float32Array): boolean {
+  return samples.every(Number.isFinite);
+}
+
 export function mixToMono(channels: readonly Float32Array[]): Float32Array {
   const [first] = channels;
   if (!first) throw new Error("audio has no channels");
-  if (channels.length === 1) return first;
+  if (channels.length === 1) return hasOnlyFiniteSamples(first) ? first : first.map(finiteOrSilent);
   const mono = new Float32Array(first.length);
   for (const channel of channels) {
-    for (let index = 0; index < mono.length; index += 1) mono[index]! += channel[index]! / channels.length;
+    for (let index = 0; index < mono.length; index += 1) mono[index]! += finiteOrSilent(channel[index]!) / channels.length;
   }
   return mono;
 }

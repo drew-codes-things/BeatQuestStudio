@@ -233,6 +233,9 @@ function checkProject(project: Project): Issue[] {
   }
   const bpmProblem = validateBpm(project.timing.bpm);
   if (bpmProblem) issues.push(issue("bpm", "error", null, null, bpmProblem));
+  if (!Number.isFinite(project.timing.offsetSeconds)) {
+    issues.push(issue("offset", "error", null, null, "The beat offset is not a number. Run Auto-map again or set the offset by hand."));
+  }
   const empty = DIFFICULTIES.filter((difficulty) => chartObjectCount(project.charts[difficulty]) === 0);
   if (empty.length === DIFFICULTIES.length) issues.push(issue("all-empty", "error", null, null, "Every difficulty is empty."));
   else for (const difficulty of empty) issues.push(issue("empty", "warning", difficulty, null, `${difficultyLabel(difficulty)} is empty and will be left out of the export.`));
