@@ -272,13 +272,47 @@ Beat Games or Meta.
 
 ## Android app
 
-`android/` holds a small Android app (Kotlin, one WebView) that opens your BeatQuest Studio server full screen. The first time it opens it asks for your server address, checks that the server answers, and remembers it. Change it later from the long-press menu on the app icon ("Change address") or from the offline page. Only https addresses are accepted, with no user name or password in them. Links to other sites open in the browser; extra hosts that may open inside the app (for example a separate file host) can be added on the same screen. The app needs Android 10 or newer and asks only for the internet permission.
+`android/` holds a small Android app (Kotlin, one WebView) that opens your
+BeatQuest Studio server full screen. The first time it opens it asks for your
+server address, checks that the server answers, and remembers it. Change it
+later from the long-press menu on the app icon ("Change address") or from the
+link on the offline page. The app needs Android 10 or newer and asks only for
+the internet permission.
+
+Saving an export (Download .zip) does not work inside the Android app yet, and
+neither do the direct folder and Quest USB install. Use the browser for those.
+
+Release builds are signed with `~/.starfire-beatquest-release.jks` (password
+in `~/.starfire-beatquest-release.pass`), or with `STARFIRE_KEYSTORE`,
+`STARFIRE_KEYSTORE_PASSWORD` and `STARFIRE_KEY_ALIAS` when those are set.
+Without a release key the build stops; add `-PallowDebugSigning` to sign with
+the debug key instead.
 
     cd android
     ./gradlew testPublicDebugUnitTest
     ./gradlew assemblePublicRelease
 
-The APK is `app/build/outputs/apk/public/release/app-public-release.apk`. Release builds are signed with `~/.starfire-beatquest-release.jks` (password in `~/.starfire-beatquest-release.pass`), or with `STARFIRE_KEYSTORE`, `STARFIRE_KEYSTORE_PASSWORD` and `STARFIRE_KEY_ALIAS` when those are set, and with the debug key when there is no release key. To build a private edition with your address built in and the setup screen skipped, copy `android/private-address.example.properties` to `android/private-address.properties` (git-ignored) and run `./gradlew assemblePrivateRelease`.
+The APK is `app/build/outputs/apk/public/release/app-public-release.apk`. To
+build a private edition with your address built in and the setup screen
+skipped, copy `android/private-address.example.properties` to
+`android/private-address.properties` (git-ignored) and run `./gradlew
+assemblePrivateRelease`.
+
+### Security notes
+
+- Only https addresses are accepted, with a full host name and no user name or
+  password in them. Plain http is refused, even on a home network.
+- Only your server's host (plus any extra hosts you add on the setup screen)
+  opens inside the app. Every other link opens in the browser.
+- If sign-in sends you to another host, add that host as an extra host, or the
+  app shows a blank page and the browser opens.
+- Downloads send your session cookie only when the download address is one of
+  your hosts. Android's download manager repeats request headers on redirects,
+  so keep download redirects on your own hosts.
+- The app has no JavaScript bridge, never accepts a bad TLS certificate (it
+  shows the offline page instead), and keeps backups off.
+
+---
 
 ## License
 
