@@ -279,8 +279,10 @@ later from the long-press menu on the app icon ("Change address") or from the
 link on the offline page. The app needs Android 10 or newer and asks only for
 the internet permission.
 
-Saving an export (Download .zip) does not work inside the Android app yet, and
-neither do the direct folder and Quest USB install. Use the browser for those.
+In the Android app **Download .zip** saves the zip into your Downloads folder.
+Each saved file is limited to 200 MB, so a zip part above that is refused with
+a message; use the browser for those. The direct folder save and the Quest USB
+install are browser-only features and do not work inside the app.
 
 Release builds are signed with `~/.starfire-beatquest-release.jks` (password
 in `~/.starfire-beatquest-release.pass`), or with `STARFIRE_KEYSTORE`,
@@ -309,8 +311,14 @@ assemblePrivateRelease`.
 - Downloads send your session cookie only when the download address is one of
   your hosts. Android's download manager repeats request headers on redirects,
   so keep download redirects on your own hosts.
-- The app has no JavaScript bridge, never accepts a bad TLS certificate (it
-  shows the offline page instead), and keeps backups off.
+- Files the page creates itself (blob: downloads) are sent to the app over a
+  message channel that only accepts your own origins and the main frame, and
+  are saved into Downloads through MediaStore with no storage permission. Each
+  file is limited to 200 MB.
+- The app adds no JavaScript interface object. The only page-to-app channel is
+  the message listener for blob: downloads described above. The app never
+  accepts a bad TLS certificate (it shows the offline page instead) and keeps
+  backups off.
 
 ---
 
