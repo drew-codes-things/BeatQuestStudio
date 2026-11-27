@@ -270,6 +270,16 @@ Beat Games or Meta.
 
 ---
 
+## Android app
+
+`android/` holds a small Android app (Kotlin, one WebView) that opens your BeatQuest Studio server full screen. The first time it opens it asks for your server address, checks that the server answers, and remembers it. Change it later from the long-press menu on the app icon ("Change address") or from the offline page. Only https addresses are accepted, with no user name or password in them. Links to other sites open in the browser; extra hosts that may open inside the app (for example a separate file host) can be added on the same screen. The app needs Android 10 or newer and asks only for the internet permission.
+
+    cd android
+    ./gradlew testPublicDebugUnitTest
+    ./gradlew assemblePublicRelease
+
+The APK is `app/build/outputs/apk/public/release/app-public-release.apk`. Release builds are signed with `~/.starfire-beatquest-release.jks` (password in `~/.starfire-beatquest-release.pass`), or with `STARFIRE_KEYSTORE`, `STARFIRE_KEYSTORE_PASSWORD` and `STARFIRE_KEY_ALIAS` when those are set, and with the debug key when there is no release key. To build a private edition with your address built in and the setup screen skipped, copy `android/private-address.example.properties` to `android/private-address.properties` (git-ignored) and run `./gradlew assemblePrivateRelease`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
